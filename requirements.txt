@@ -1,0 +1,44 @@
+# DealFinder - Requirements
+# Generated: 2025-01-16
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# Database
+sqlalchemy>=2.0.25
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+
+# Redis
+redis>=5.0.1
+
+# Message Queue
+aio-pika>=9.4.0
+
+# HTTP Client
+httpx>=0.26.0
+tenacity>=8.2.3
+
+# Email
+jinja2>=3.1.3
+weasyprint>=60.2
+
+# Configuration
+pyyaml>=6.0.1
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+
+# Utilities
+python-dateutil>=2.8.2
+uuid>=1.30
+
+# Testing
+pytest>=7.4.4
+pytest-asyncio>=0.23.3
+pytest-cov>=4.1.0
+
+# Development
+black>=23.12.1
+isort>=5.13.2
+mypy>=1.8.0

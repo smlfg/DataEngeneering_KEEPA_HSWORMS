@@ -1,0 +1,56 @@
+# DealFinder Data Layer
+from src.data.database import (
+    get_async_session,
+    get_sync_session,
+    get_async_session_context,
+    close_async_engine,
+    AsyncSessionLocal,
+    SyncSessionLocal,
+)
+from src.data.entities import (
+    Base,
+    User,
+    DealFilter,
+    Deal,
+    DealSnapshot,
+    DealReport,
+    DealClick,
+    ReportOpen,
+    KeepaApiLog,
+    GdprConsentLog,
+    GdprDeletionRequest,
+)
+from src.data.repositories import (
+    UserRepository,
+    FilterRepository,
+    DealRepository,
+    ReportRepository,
+    ClickRepository,
+    GdprRepository,
+)
+
+__all__ = [
+    "get_async_session",
+    "get_sync_session",
+    "get_async_session_context",
+    "close_async_engine",
+    "AsyncSessionLocal",
+    "SyncSessionLocal",
+    "Base",
+    "User",
+    "DealFilter",
+    "Deal",
+    "DealSnapshot",
+    "DealReport",
+    "DealClick",
+    "ReportOpen",
+    "KeepaApiLog",
+    "GdprConsentLog",
+    "GdprDeletionRequest",
+    "UserRepository",
+    "FilterRepository",
+    "DealRepository",
+    "ReportRepository",
+    "ClickRepository",
+    "GdprRepository",
+]
