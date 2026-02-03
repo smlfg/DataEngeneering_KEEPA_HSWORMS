@@ -1,0 +1,5 @@
+opencode_running: yes
+opencode_pid: 1323038
+subagents_active: 0
+timestamp: 2026-01-12 16:12:12
+session_id: session-20260110-231309

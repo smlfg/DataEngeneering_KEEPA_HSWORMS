@@ -1,0 +1,28 @@
+{
+  "thresholds": {
+    "ram": {
+      "sustained_critical_percent": 90,
+      "sustained_critical_duration": 120,
+      "blocking_percent": 95,
+      "blocking_duration": 0
+    },
+    "cpu": {
+      "sustained_critical_percent": 75,
+      "sustained_critical_duration": 300
+    },
+    "disk": {
+      "sustained_percent": 90,
+      "sustained_duration": 0
+    },
+    "containers": {
+      "restart_threshold": 3,
+      "restart_window_seconds": 600
+    }
+  },
+  "rate_limiting": {
+    "default_interval_seconds": 600
+  },
+  "log": {
+    "file": "/var/log/arbitrage-alerts.log"
+  }
+}

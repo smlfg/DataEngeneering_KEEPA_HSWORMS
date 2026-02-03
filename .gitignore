@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+.docker/
+
+# Elasticsearch
+elasticsearch-data/
+
+# Kafka
+kafka-data/
+
+# Zookeeper
+zookeeper-data/
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets
+*.pem
+*.key
+KEEPA_API_KEY

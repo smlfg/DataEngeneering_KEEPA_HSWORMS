@@ -1,0 +1,522 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # DATA STORES
+  # =============================================================================
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: arbitrage-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - indices.memory.index_buffer_size=20%
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - arbitrage-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: arbitrage-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - arbitrage-network
+
+  # =============================================================================
+  # MESSAGE QUEUE
+  # =============================================================================
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: arbitrage-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
+      # JMX deaktiviert wegen Port-Konflikten
+      # KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=kafka -Dcom.sun.management.jmxremote.rmi.port=9999"
+      # JMX_PORT: 9999
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    depends_on:
+      zookeeper:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server kafka:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - arbitrage-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: arbitrage-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - arbitrage-network
+
+  # =============================================================================
+  # APPLICATION SERVICES
+  # =============================================================================
+
+  producer:
+    build:
+      context: .
+      dockerfile: src/producer/Dockerfile
+    container_name: arbitrage-producer
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KEEPA_API_KEY=${KEEPA_API_KEY}
+      - KAFKA_TOPIC_RAW_UPDATES=raw.keepa_updates
+      - POLL_INTERVAL_SECONDS=300
+      - ASIN_WATCHLIST=${ASIN_WATCHLIST:-B075CYMYK6,B08G9PKCGK,B0D1XD1ZV3}
+      - CATEGORY_MODE=false
+      - CATEGORY_POLL_INTERVAL=7200
+      - CATEGORY_CONFIG=${CATEGORY_CONFIG:-config/categories.yaml}
+    volumes:
+      - ./config:/app/config:ro
+      - ./src:/app/src:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  enrichment-consumer:
+    build:
+      context: .
+      dockerfile: src/consumer/Dockerfile
+    container_name: arbitrage-enrichment-consumer
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC_RAW=raw.keepa_updates
+      - KAFKA_TOPIC_ENRICHED=products.enriched
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=products
+      - CONSUMER_GROUP=enrichment-consumer
+    depends_on:
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  arbitrage-detector:
+    build:
+      context: .
+      dockerfile: src/arbitrage/Dockerfile
+    container_name: arbitrage-detector
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC_ENRICHED=products.enriched
+      - KAFKA_TOPIC_ALERTS=arbitrage.alerts
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=products
+      - MIN_MARGIN_THRESHOLD=15
+      - CONSUMER_GROUP=arbitrage-detector
+    depends_on:
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: src/api/Dockerfile
+    container_name: arbitrage-api
+    environment:
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=products
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - HOST=0.0.0.0
+      - PORT=8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: src/dashboard/Dockerfile
+    container_name: arbitrage-dashboard
+    environment:
+      - API_BASE_URL=${API_BASE_URL:-http://api:8000}
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_HEADLESS=true
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  # =============================================================================
+  # MONITORING
+  # =============================================================================
+
+  kafkacat:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: arbitrage-kafkacat
+    command: sleep infinity
+    networks:
+      - arbitrage-network
+
+  init-topics:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: arbitrage-init-topics
+    command: >
+      bash -c "
+      echo 'Waiting for Kafka to be ready...';
+      sleep 10;
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --topic raw.keepa_updates --partitions 3 --replication-factor 1 || true;
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --topic products.enriched --partitions 3 --replication-factor 1 || true;
+      kafka-topics.sh --bootstrap-server kafka:9092 --create --topic arbitrage.alerts --partitions 1 --replication-factor 1 || true;
+      echo 'Topics created or already exist';
+      "
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - arbitrage-network
+
+  # =============================================================================
+  # AIRFLOW ORCHESTRATION
+  # =============================================================================
+
+  postgres:
+    image: postgres:15
+    container_name: arbitrage-postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - arbitrage-network
+
+  redis:
+    image: redis:latest
+    container_name: arbitrage-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  airflow-webserver:
+    image: apache/airflow:2.8.1
+    container_name: arbitrage-airflow-webserver
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-zTvhk3YUqzCcFdP0t0vGPAsp1978aI0yHNlLxA4Xr8E=}
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__CORE__LOAD_EXAMPLES=false
+      - AIRFLOW__CORE__PARALLELISM=1
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+      - AIRFLOW__WEBSERVER__RBAC=true
+      - AIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0
+      - AIRFLOW__LOGGING__REMOTE_LOGGING=false
+      - _PIP_ADDITIONAL_REQUIREMENTS=apache-airflow-providers-apache-kafka confluent-kafka requests pyyaml
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./config:/opt/airflow/config:ro
+    ports:
+      - "8080:8080"
+    command: webserver
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.1'
+          memory: 256M
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/health"]
+      interval: 120s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.1
+    container_name: arbitrage-airflow-scheduler
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-zTvhk3YUqzCcFdP0t0vGPAsp1978aI0yHNlLxA4Xr8E=}
+      - AIRFLOW__CORE__PARALLELISM=1
+      - AIRFLOW__LOGGING__REMOTE_LOGGING=false
+      - _PIP_ADDITIONAL_REQUIREMENTS=apache-airflow-providers-apache-kafka confluent-kafka requests pyyaml
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./config:/opt/airflow/config:ro
+    command: scheduler
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.1'
+          memory: 256M
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  airflow-worker:
+    image: apache/airflow:2.8.1
+    container_name: arbitrage-airflow-worker
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-zTvhk3YUqzCcFdP0t0vGPAsp1978aI0yHNlLxA4Xr8E=}
+      - AIRFLOW__CORE__PARALLELISM=1
+      - AIRFLOW__LOGGING__REMOTE_LOGGING=false
+      - AIRFLOW_CONN_KAFKA_DEFAULT=kafka://kafka:9092
+      - _PIP_ADDITIONAL_REQUIREMENTS=apache-airflow-providers-apache-kafka confluent-kafka requests pyyaml
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./config:/opt/airflow/config:ro
+    command: celery worker
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.1'
+          memory: 256M
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - arbitrage-network
+    restart: unless-stopped
+
+  airflow-init:
+    image: apache/airflow:2.8.1
+    container_name: arbitrage-airflow-init
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-zTvhk3YUqzCcFdP0t0vGPAsp1978aI0yHNlLxA4Xr8E=}
+      - _AIRFLOW_DB_MIGRATE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+      - _PIP_ADDITIONAL_REQUIREMENTS=apache-airflow-providers-apache-kafka confluent-kafka requests pyyaml
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./config:/opt/airflow/config:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - arbitrage-network
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      pip install --no-cache-dir apache-airflow-providers-apache-kafka confluent-kafka requests pyyaml &&
+      airflow db init &&
+      airflow users create \
+        --username admin \
+        --password admin \
+        --firstname Admin \
+        --lastname User \
+        --role Admin \
+        --email admin@example.com || true
+      "
+
+volumes:
+  elasticsearch-data:
+    driver: local
+  kafka-data:
+    driver: local
+  zookeeper-data:
+    driver: local
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  arbitrage-network:
+    driver: bridge

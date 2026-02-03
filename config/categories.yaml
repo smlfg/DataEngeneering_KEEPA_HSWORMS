@@ -1,0 +1,86 @@
+# Keyboard Category Configuration for Arbitrage Tracker
+# Format: COUNTRY_CODE (domain_id) -> Categories
+# Updated with correct Keepa Domain IDs from official API docs
+
+# Keepa Domain IDs (OFFICIAL from https://keepa.com/#/api):
+# 1=US, 2=UK, 3=DE, 4=FR, 5=JP, 6=CA, 8=IT, 9=ES, 10=IN
+
+COUNTRIES:
+  DE:
+    domain_id: 3
+    name: "Germany"
+    categories:
+      gaming:
+        keepa_id: 430253031  # Gaming Keyboards (DE)
+        name: "Gaming Keyboards"
+        limit: 100
+      office:
+        keepa_id: 430221031  # Keyboards (General DE)
+        name: "Office Keyboards"
+        limit: 100
+
+  UK:
+    domain_id: 2
+    name: "United Kingdom"
+    categories:
+      gaming:
+        keepa_id: 13978270031 # Gaming Keyboards (UK)
+        name: "Gaming Keyboards"
+        limit: 100
+      office:
+        keepa_id: 430565031   # Keyboards (General UK)
+        name: "Office Keyboards"
+        limit: 100
+
+  IT:
+    domain_id: 8
+    name: "Italy"
+    categories:
+      gaming:
+        keepa_id: 430253031
+        name: "Gaming Keyboards"
+        limit: 100
+      office:
+        keepa_id: 430221031
+        name: "Office Keyboards"
+        limit: 100
+
+  ES:
+    domain_id: 9
+    name: "Spain"
+    categories:
+      gaming:
+        keepa_id: 430253031
+        name: "Gaming Keyboards"
+        limit: 100
+      office:
+        keepa_id: 430221031
+        name: "Office Keyboards"
+        limit: 100
+
+  FR:
+    domain_id: 4
+    name: "France"
+    categories:
+      gaming:
+        keepa_id: 430253031
+        name: "Gaming Keyboards"
+        limit: 100
+      office:
+        keepa_id: 430221031
+        name: "Office Keyboards"
+        limit: 100
+
+# Target Market Configuration
+TARGET_MARKET: "DE"  # Where we sell (Germany is usually highest prices)
+TARGET_CURRENCY: "EUR"
+
+# Filter Settings
+MIN_REVIEWS: 10       # Minimum number of reviews
+MIN_RATING: 3.5       # Minimum star rating
+MAX_PRICE: 500        # Maximum price in EUR
+
+# Token Budget Configuration
+# 20 tokens/minute = 28,800 tokens/day
+DAILY_TOKEN_LIMIT: 28800
+CATEGORY_CACHE_TTL: 21600  # 6 hours in seconds
