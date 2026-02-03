@@ -1,0 +1,93 @@
+from services.keepa_api import keepa_client
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+
+
+class PriceMonitorAgent:
+    BATCH_SIZE = 50
+    VOLATILE_THRESHOLD = 5.0
+    STABLE_THRESHOLD = 2.0
+
+    async def fetch_prices(self, asins: List[str]) -> List[Dict[str, Any]]:
+        results = []
+        for asin in asins:
+            price_data = await keepa_client.query_product(asin)
+            if price_data:
+                results.append(price_data)
+        return results
+
+    def calculate_volatility(
+        self, current_price: float, last_price: Optional[float]
+    ) -> float:
+        if not last_price or last_price == 0:
+            return 0.0
+        return abs(current_price - last_price) / last_price * 100
+
+    def determine_next_check_interval(self, volatility_score: float) -> timedelta:
+        if volatility_score > self.VOLATILE_THRESHOLD:
+            return timedelta(hours=2)
+        elif volatility_score > self.STABLE_THRESHOLD:
+            return timedelta(hours=4)
+        else:
+            return timedelta(hours=6)
+
+    async def check_prices(self, watches: List[Dict[str, Any]]) -> Dict[str, Any]:
+        alerts = []
+        processed = 0
+        errors = 0
+
+        for watch in watches:
+            try:
+                asin = watch["asin"]
+                target_price = watch["target_price"]
+
+                result = await keepa_client.query_product(asin)
+
+                if result:
+                    current_price = result.get("current_price", 0)
+
+                    if current_price <= target_price * 1.01:
+                        alerts.append(
+                            {
+                                "asin": asin,
+                                "current_price": current_price,
+                                "target_price": target_price,
+                                "alert_triggered": True,
+                            }
+                        )
+
+                    processed += 1
+                else:
+                    errors += 1
+            except Exception as e:
+                errors += 1
+                print(f"Error checking price for {watch.get('asin')}: {e}")
+
+        return {
+            "processed": processed,
+            "alerts_triggered": len(alerts),
+            "errors": errors,
+            "alerts": alerts,
+        }
+
+    async def batch_check(self, all_watches: List[Dict[str, Any]]) -> Dict[str, Any]:
+        all_alerts = []
+        total_processed = 0
+        total_errors = 0
+
+        for i in range(0, len(all_watches), self.BATCH_SIZE):
+            batch = all_watches[i : i + self.BATCH_SIZE]
+            result = await self.check_prices(batch)
+            all_alerts.extend(result["alerts"])
+            total_processed += result["processed"]
+            total_errors += result["errors"]
+
+        return {
+            "processed": total_processed,
+            "alerts": all_alerts,
+            "errors": total_errors,
+            "batches": (len(all_watches) + self.BATCH_SIZE - 1) // self.BATCH_SIZE,
+        }
+
+
+price_monitor = PriceMonitorAgent()
