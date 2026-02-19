@@ -1,4 +1,4 @@
-from services.notification import notification_service
+from src.services.notification import notification_service
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import re
@@ -82,15 +82,23 @@ class AlertDispatcherAgent:
         formatted = self.format_alert(alert, channel)
 
         if channel == "email":
-            result = await notification_service.send_email(
-                to=alert.get("email", "user@example.com"),
+            to_addr = alert.get("email") or "user@example.com"
+            return await notification_service.send_email(
+                to=to_addr,
                 subject=formatted["subject"],
                 text_body=formatted["body"],
+                html_body=formatted["body"],
             )
-        else:
-            result = {"success": False, "error": "Channel not implemented"}
+        if channel == "telegram":
+            return await notification_service.send_telegram(
+                chat_id=alert.get("telegram_chat_id", ""), text=formatted["body"]
+            )
+        if channel == "discord":
+            return await notification_service.send_discord(
+                webhook_url=alert.get("discord_webhook", ""), content=formatted["body"]
+            )
 
-        return result
+        return {"success": False, "error": f"Channel {channel} not implemented"}
 
     async def dispatch_alert(
         self, alert: Dict[str, Any], channels: List[str] = None

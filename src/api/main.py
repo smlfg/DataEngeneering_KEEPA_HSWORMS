@@ -1,28 +1,32 @@
 """
 Keeper System API - Main FastAPI Application
-With PostgreSQL persistence and real-time price monitoring
+With PostgreSQL persistence, Elasticsearch search, and real-time price monitoring
 """
 
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 
-from services.database import (
+from src.services.database import (
     init_db,
-    create_watch,
+    create_watch as db_create_watch,
     get_user_watches,
-    update_watch_price,
-    get_pending_alerts,
-    mark_alert_sent,
+    soft_delete_watch,
+    get_active_watch_count,
 )
-from services.keepa_api import KeepaAPIClient, TokenLimitError, NoDealAccessError
-from services.keepa_api import get_keepa_client
-from scheduler import run_immediate_check, check_single_asin
+from src.services.keepa_api import TokenLimitError, NoDealAccessError
+from src.services.keepa_api import get_keepa_client
+from src.services.elasticsearch_service import es_service
+from src.agents.deal_finder import deal_finder
+from src.scheduler import run_immediate_check, check_single_asin
+from src.config import get_settings
+
+settings = get_settings()
 
 
 # Pydantic Models
@@ -81,6 +85,7 @@ class DealResponse(BaseModel):
     prime_eligible: bool
     url: str
     deal_score: float
+    source: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
@@ -127,8 +132,17 @@ async def lifespan(app: FastAPI):
     print("🚀 Keeper System starting...")
     await init_db()
     print("✅ Database initialized")
+
+    # Connect to Elasticsearch
+    await es_service.connect()
+    print("✅ Elasticsearch connected")
+
     print("✅ Keeper System ready!")
     yield
+
+    # Cleanup
+    await es_service.close()
+    print("👋 Keeper System shut down")
 
 
 app = FastAPI(
@@ -140,7 +154,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5601", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -153,12 +167,13 @@ async def health_check():
     """Health check endpoint"""
     client = get_keepa_client()
     token_status = client.get_token_status()
+    watches_count = await get_active_watch_count()
 
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "tokens_available": token_status.get("tokens_available", 0),
-        "watches_count": 0,  # Will be updated with actual count
+        "watches_count": watches_count,
     }
 
 
@@ -230,7 +245,7 @@ async def create_watch(
         current_price = product_data.get("current_price", 0) if product_data else None
 
         # Create watch in database
-        watch = await create_watch(
+        watch = await db_create_watch(
             user_id=user_id,
             asin=request.asin,
             target_price=request.target_price,
@@ -258,9 +273,21 @@ async def create_watch(
 @app.delete("/api/v1/watches/{watch_id}", response_model=WatchDeleteResponse)
 async def delete_watch(watch_id: str, user_id: str = Query(..., description="User ID")):
     """Delete a watch (mark as inactive)"""
-    # For now, just return success
-    # In production, you'd query and update the database
-    return {"status": "deleted", "message": f"Watch {watch_id} deleted successfully"}
+    try:
+        deleted = await soft_delete_watch(watch_id, user_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Watch not found")
+        return {
+            "status": "deleted",
+            "message": f"Watch {watch_id} deleted successfully",
+        }
+    except ValueError:
+        # UUID conversion error
+        raise HTTPException(status_code=400, detail="Invalid watch_id or user_id")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting watch: {str(e)}")
 
 
 # Price Check Endpoints
@@ -322,58 +349,233 @@ async def trigger_price_check_all():
 @app.post("/api/v1/deals/search", response_model=List[DealResponse])
 async def search_deals(request: DealSearchRequest):
     """Search for deals matching the specified criteria"""
-    from services.keepa_api import DealFilters
-
     try:
-        client = get_keepa_client()
-        filters = DealFilters(
-            page=0,
-            domain_id=3,  # Germany
-            min_rating=int(request.min_rating),
-            min_reviews=10,
-        )
-
-        # Note: Full deal search with all filters would need additional
-        # implementation in the KeepaAPIClient.search_deals method
-
-        result = client.search_deals(filters)
-
-        deals = []
-        for deal in result.get("deals", []):
-            discount = deal.get("discount_percent", 0)
-
-            # Apply request filters
-            if (
-                discount >= request.min_discount
-                and discount <= request.max_discount
-                and deal.get("current_price", 0) >= request.min_price
-                and deal.get("current_price", 0) <= request.max_price
-            ):
-                deal_score = discount * 0.4 + deal.get("rating", 0) * 20 * 0.6
-
-                deals.append(
-                    {
-                        "asin": deal.get("asin", ""),
-                        "title": deal.get("title", ""),
-                        "current_price": deal.get("current_price", 0),
-                        "list_price": deal.get("list_price", 0),
-                        "discount_percent": discount,
-                        "rating": deal.get("rating", 0),
-                        "reviews": deal.get("reviews", 0),
-                        "prime_eligible": deal.get("prime_eligible", False),
-                        "url": deal.get("url", ""),
-                        "deal_score": deal_score,
-                    }
-                )
-
+        filter_config = {
+            "categories": request.categories,
+            "min_discount": request.min_discount,
+            "max_discount": request.max_discount,
+            "min_price": request.min_price,
+            "max_price": request.max_price,
+            "min_rating": request.min_rating,
+        }
+        deals = await deal_finder.search_deals(filter_config)
         return deals[:15]
 
     except TokenLimitError as e:
         raise HTTPException(status_code=429, detail=str(e))
     except NoDealAccessError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        # Product-only mode can still run even if Keepa deal endpoint is unavailable.
+        fallback_config = {
+            "categories": request.categories,
+            "min_discount": request.min_discount,
+            "max_discount": request.max_discount,
+            "min_price": request.min_price,
+            "max_price": request.max_price,
+            "min_rating": request.min_rating,
+        }
+        try:
+            return await deal_finder.search_deals(fallback_config)
+        except Exception:
+            raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error searching deals: {str(e)}")
+
+
+# Elasticsearch-based Deal Search Endpoint
+class ElasticsearchDealSearchRequest(BaseModel):
+    """Request model for Elasticsearch-based deal search"""
+
+    query: Optional[str] = Field(None, description="Search query for title/description")
+    min_discount: float = Field(
+        default=0, ge=0, le=100, description="Minimum discount percent"
+    )
+    max_discount: float = Field(
+        default=100, ge=0, le=100, description="Maximum discount percent"
+    )
+    min_price: Optional[float] = Field(None, ge=0, description="Minimum price")
+    max_price: Optional[float] = Field(None, ge=0, description="Maximum price")
+    min_rating: float = Field(default=0, ge=0, le=5, description="Minimum rating")
+    domain: Optional[str] = Field(None, description="Domain filter (e.g., 'amazon.de')")
+    category: Optional[str] = Field(None, description="Category filter")
+    page: int = Field(default=0, ge=0, description="Page number")
+    size: int = Field(default=15, ge=1, le=100, description="Results per page")
+
+
+class ElasticsearchDealResponse(BaseModel):
+    """Response model for Elasticsearch deal search"""
+
+    total: int
+    deals: List[Dict[str, Any]]
+    aggregations: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/v1/deals/es-search", response_model=ElasticsearchDealResponse)
+async def search_deals_elasticsearch(request: ElasticsearchDealSearchRequest):
+    """
+    Search deals using Elasticsearch.
+    Supports full-text search, filters, fuzzy matching, and aggregations.
+    """
+    try:
+        # Build the Elasticsearch query
+        must_clauses = []
+        filter_clauses = []
+
+        # Full-text search on title and description
+        if request.query:
+            must_clauses.append(
+                {
+                    "multi_match": {
+                        "query": request.query,
+                        "fields": ["title^3", "description", "title.keyword"],
+                        "fuzziness": "AUTO",
+                        "operator": "or",
+                    }
+                }
+            )
+
+        # Discount range filter
+        filter_clauses.append(
+            {
+                "range": {
+                    "discount_percent": {
+                        "gte": request.min_discount,
+                        "lte": request.max_discount,
+                    }
+                }
+            }
+        )
+
+        # Price range filter
+        if request.min_price or request.max_price:
+            price_range = {"range": {"current_price": {}}}
+            if request.min_price:
+                price_range["range"]["current_price"]["gte"] = request.min_price
+            if request.max_price:
+                price_range["range"]["current_price"]["lte"] = request.max_price
+            filter_clauses.append(price_range)
+
+        # Rating filter
+        if request.min_rating > 0:
+            filter_clauses.append({"range": {"rating": {"gte": request.min_rating}}})
+
+        # Domain filter
+        if request.domain:
+            filter_clauses.append({"term": {"domain": request.domain}})
+
+        # Category filter
+        if request.category:
+            filter_clauses.append({"term": {"category": request.category}})
+
+        # Build final query
+        if must_clauses or filter_clauses:
+            query = {"bool": {}}
+            if must_clauses:
+                query["bool"]["must"] = must_clauses
+            if filter_clauses:
+                query["bool"]["filter"] = filter_clauses
+        else:
+            query = {"match_all": {}}
+
+        # Check if ES client is available
+        if not es_service.client:
+            raise HTTPException(status_code=503, detail="Elasticsearch not available")
+
+        # Execute search with aggregations
+        result = await es_service.client.search(
+            index=settings.elasticsearch_index_deals,
+            query=query,
+            from_=request.page * request.size,
+            size=request.size,
+            sort=[{"deal_score": "desc"}, {"timestamp": "desc"}],
+            aggs={
+                "by_category": {"terms": {"field": "category", "size": 20}},
+                "by_domain": {"terms": {"field": "domain", "size": 10}},
+                "price_stats": {"stats": {"field": "current_price"}},
+                "discount_stats": {"stats": {"field": "discount_percent"}},
+                "rating_stats": {"stats": {"field": "rating"}},
+                "top_deals_by_discount": {
+                    "terms": {"field": "discount_percent", "size": 10}
+                },
+            },
+        )
+
+        # Parse results
+        hits = result.get("hits", {})
+        total = hits.get("total", {}).get("value", 0)
+
+        deals = []
+        for hit in hits.get("hits", []):
+            deal = hit.get("_source", {})
+            deal["_score"] = hit.get("_score")
+            deals.append(deal)
+
+        aggregations = result.get("aggregations", {})
+
+        return {"total": total, "deals": deals, "aggregations": aggregations}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error searching deals in Elasticsearch: {str(e)}"
+        )
+
+
+@app.get("/api/v1/deals/aggregations")
+async def get_deal_aggregations(
+    min_discount: float = Query(default=0, ge=0, le=100),
+    min_rating: float = Query(default=0, ge=0, le=5),
+    domain: Optional[str] = Query(default=None),
+):
+    """
+    Get aggregated deal statistics from Elasticsearch.
+    Useful for dashboards and analytics.
+    """
+    try:
+        aggregations = await es_service.get_deal_aggregations(
+            min_discount=min_discount, min_rating=min_rating, domain=domain
+        )
+        return aggregations
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error getting aggregations: {str(e)}"
+        )
+
+
+@app.post("/api/v1/deals/index")
+async def index_deal_to_elasticsearch(deal: Dict[str, Any]):
+    """
+    Index a deal document to Elasticsearch.
+    Used by the DealFinderAgent to store deals for search.
+    """
+    try:
+        # Transform deal data to match ES mapping
+        es_doc = {
+            "asin": deal.get("asin", ""),
+            "title": deal.get("title", ""),
+            "description": deal.get("description", ""),
+            "current_price": deal.get("current_price", 0),
+            "original_price": deal.get("list_price", 0),
+            "discount_percent": deal.get("discount_percent", 0),
+            "rating": deal.get("rating", 0),
+            "review_count": deal.get("reviews", 0),
+            "sales_rank": deal.get("sales_rank", 0),
+            "domain": deal.get("domain", "amazon.de"),
+            "category": deal.get("category", "general"),
+            "prime_eligible": deal.get("prime_eligible", False),
+            "url": deal.get("url", ""),
+            "deal_score": deal.get("deal_score", 0),
+            "timestamp": datetime.utcnow().isoformat(),
+            "event_type": "deal_indexed",
+        }
+
+        success = await es_service.index_deal_update(es_doc)
+
+        if success:
+            return {"status": "indexed", "asin": es_doc["asin"]}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to index deal")
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error indexing deal: {str(e)}")
 
 
 # Rate Limit Endpoints

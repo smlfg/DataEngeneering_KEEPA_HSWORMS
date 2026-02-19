@@ -1,0 +1,400 @@
+import pytest
+from unittest.mock import AsyncMock, patch, MagicMock
+
+from src.agents.deal_finder import DealFinderAgent, deal_finder
+
+
+@pytest.fixture
+def agent():
+    return DealFinderAgent()
+
+
+@pytest.fixture
+def sample_deal():
+    return {
+        "asin": "B08N5WRWNW",
+        "title": "Test Product",
+        "current_price": 100.0,
+        "list_price": 150.0,
+        "discount_percent": 33.3,
+        "rating": 4.5,
+        "reviews": 120,
+        "sales_rank": 5000,
+        "url": "https://amazon.de/dp/B08N5WRWNW",
+        "source": "product_api",
+    }
+
+
+@pytest.fixture
+def sample_filter_config():
+    return {
+        "seed_asins": ["B08N5WRWNW", "B09G9FPHY6"],
+        "min_discount": 20,
+        "max_discount": 80,
+        "min_price": 50,
+        "max_price": 500,
+        "min_rating": 4.0,
+    }
+
+
+class TestDealFinderInit:
+    def test_init_default_settings(self, agent):
+        assert agent.MIN_RATING == 3.5
+        assert agent.MIN_DEALS_FOR_REPORT == 5
+        assert agent.MAX_DEALS_PER_REPORT == 15
+        assert agent.MIN_PRICE_THRESHOLD == 10.0
+
+
+class TestSeedSource:
+    def test_get_seed_asins_uses_file_when_env_empty(self, agent, tmp_path):
+        seed_file = tmp_path / "seed_asins.txt"
+        seed_file.write_text("B08N5WRWNW,B09G9FPHY6", encoding="utf-8")
+
+        agent.settings.deal_seed_asins = ""
+        agent.settings.deal_seed_file = str(seed_file)
+
+        result = agent._get_seed_asins({})
+        assert "B08N5WRWNW" in result
+        assert "B09G9FPHY6" in result
+
+    def test_select_candidate_asins_rotates_with_offset(self, agent):
+        seeds = ["B000000001", "B000000002", "B000000003", "B000000004"]
+
+        first_batch = agent._select_candidate_asins(seeds, max_asins=2, start_offset=0)
+        wrapped_batch = agent._select_candidate_asins(seeds, max_asins=2, start_offset=3)
+
+        assert first_batch == ["B000000001", "B000000002"]
+        assert wrapped_batch == ["B000000004", "B000000001"]
+
+
+class TestSearchDeals:
+    @pytest.mark.asyncio
+    async def test_search_deals_uses_start_offset_rotation(self, agent):
+        seeds = ["B000000001", "B000000002", "B000000003", "B000000004"]
+        filter_config = {
+            "seed_asins": seeds,
+            "max_asins": 2,
+            "start_offset": 3,
+            "min_discount": 0,
+            "max_discount": 100,
+            "min_price": 0,
+            "max_price": 1000,
+            "min_rating": 0,
+        }
+
+        async def fake_product(asin):
+            return {
+                "asin": asin,
+                "title": f"Product {asin}",
+                "current_price": 50.0,
+                "list_price": 100.0,
+                "rating": 4.2,
+                "offers_count": 30,
+            }
+
+        with patch("src.agents.deal_finder.keepa_client") as mock_client:
+            mock_client.query_product = AsyncMock(side_effect=fake_product)
+            await agent.search_deals(filter_config)
+
+            called_asins = [call.args[0] for call in mock_client.query_product.await_args_list]
+            assert called_asins == ["B000000004", "B000000001"]
+
+    @pytest.mark.asyncio
+    async def test_search_deals_returns_list_of_scored_deals(
+        self, agent, sample_filter_config
+    ):
+        with patch("src.agents.deal_finder.keepa_client") as mock_client:
+            mock_client.query_product = AsyncMock(
+                side_effect=[
+                    {
+                        "asin": "B08N5WRWNW",
+                        "title": "Product A",
+                        "current_price": 99.0,
+                        "list_price": 150.0,
+                        "rating": 4.6,
+                        "offers_count": 200,
+                    },
+                    {
+                        "asin": "B09G9FPHY6",
+                        "title": "Product B",
+                        "current_price": 120.0,
+                        "list_price": 220.0,
+                        "rating": 4.2,
+                        "offers_count": 100,
+                    },
+                ]
+            )
+
+            result = await agent.search_deals(sample_filter_config)
+
+            assert isinstance(result, list)
+            assert len(result) == 2
+            assert all("deal_score" in deal for deal in result)
+            assert all("current_price" in deal for deal in result)
+
+    @pytest.mark.asyncio
+    async def test_search_deals_empty_response_returns_empty_list(
+        self, agent, sample_filter_config
+    ):
+        with patch("src.agents.deal_finder.keepa_client") as mock_client:
+            mock_client.query_product = AsyncMock(return_value=None)
+
+            result = await agent.search_deals(sample_filter_config)
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_search_deals_handles_api_error(self, agent, sample_filter_config):
+        with patch("src.agents.deal_finder.keepa_client") as mock_client:
+            mock_client.query_product = AsyncMock(
+                side_effect=[Exception("API Error"), None]
+            )
+
+            result = await agent.search_deals(sample_filter_config)
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_search_deals_respects_max_per_report(self, agent):
+        asins = [f"B{i:09d}"[:10] for i in range(30)]
+        filter_config = {
+            "seed_asins": asins,
+            "min_discount": 0,
+            "max_discount": 100,
+            "min_price": 0,
+            "max_price": 1000,
+            "min_rating": 0,
+        }
+
+        with patch("src.agents.deal_finder.keepa_client") as mock_client:
+            mock_client.query_product = AsyncMock(
+                return_value={
+                    "asin": "B08N5WRWNW",
+                    "title": "X",
+                    "current_price": 100,
+                    "list_price": 200,
+                    "rating": 4.0,
+                    "offers_count": 10,
+                }
+            )
+            result = await agent.search_deals(filter_config)
+
+            assert len(result) <= agent.MAX_DEALS_PER_REPORT
+
+
+class TestScoreDeal:
+    def test_score_deal_higher_discount_higher_score(self, agent):
+        deal1 = {
+            "discount_percent": 50,
+            "rating": 4.0,
+            "sales_rank": 1000,
+            "current_price": 100,
+        }
+        deal2 = {
+            "discount_percent": 20,
+            "rating": 4.0,
+            "sales_rank": 1000,
+            "current_price": 100,
+        }
+
+        scored1 = agent._score_deal(deal1)
+        scored2 = agent._score_deal(deal2)
+
+        assert scored1["deal_score"] > scored2["deal_score"]
+
+    def test_score_deal_reviews_rating_boost_score(self, agent):
+        deal1 = {
+            "discount_percent": 30,
+            "rating": 5.0,
+            "sales_rank": 1000,
+            "current_price": 100,
+        }
+        deal2 = {
+            "discount_percent": 30,
+            "rating": 3.0,
+            "sales_rank": 1000,
+            "current_price": 100,
+        }
+
+        scored1 = agent._score_deal(deal1)
+        scored2 = agent._score_deal(deal2)
+
+        assert scored1["deal_score"] > scored2["deal_score"]
+
+    def test_score_deal_includes_all_components(self, agent, sample_deal):
+        result = agent._score_deal(sample_deal)
+
+        assert "deal_score" in result
+        assert 0 <= result["deal_score"] <= 100
+
+
+class TestFilterSpam:
+    def test_filter_spam_removes_low_rating(self, agent):
+        deals = [
+            {
+                "rating": 2.0,
+                "current_price": 50,
+                "title": "Bad Product",
+                "discount_percent": 30,
+            },
+            {
+                "rating": 4.5,
+                "current_price": 50,
+                "title": "Good Product",
+                "discount_percent": 30,
+            },
+        ]
+
+        result = agent.filter_spam(deals)
+        assert len(result) == 1
+        assert result[0]["rating"] == 4.5
+
+    def test_filter_spam_removes_low_price(self, agent):
+        deals = [
+            {
+                "rating": 4.5,
+                "current_price": 5,
+                "title": "Cheap Product",
+                "discount_percent": 30,
+            },
+            {
+                "rating": 4.5,
+                "current_price": 50,
+                "title": "Good Product",
+                "discount_percent": 30,
+            },
+        ]
+
+        result = agent.filter_spam(deals)
+        assert len(result) == 1
+        assert result[0]["current_price"] == 50
+
+    def test_filter_spam_removes_dropshipper_keywords(self, agent):
+        deals = [
+            {
+                "rating": 4.5,
+                "current_price": 50,
+                "title": "Dropship Product",
+                "discount_percent": 30,
+            },
+            {
+                "rating": 4.5,
+                "current_price": 50,
+                "title": "Good Product",
+                "discount_percent": 30,
+            },
+        ]
+
+        result = agent.filter_spam(deals)
+        assert len(result) == 1
+        assert "Good" in result[0]["title"]
+
+
+class TestShouldSendReport:
+    def test_should_send_report_true_with_enough_deals(self, agent):
+        deals = [
+            {
+                "rating": 4.5,
+                "current_price": 50,
+                "title": "Product",
+                "discount_percent": 30,
+            }
+            for _ in range(10)
+        ]
+        assert agent.should_send_report(deals) is True
+
+    def test_should_send_report_false_with_few_deals(self, agent):
+        deals = [
+            {
+                "rating": 4.5,
+                "current_price": 50,
+                "title": "Product",
+                "discount_percent": 30,
+            }
+            for _ in range(3)
+        ]
+        assert agent.should_send_report(deals) is False
+
+
+class TestGenerateReport:
+    @pytest.mark.asyncio
+    async def test_generate_report_returns_html(self, agent):
+        deals = [
+            {
+                "rating": 4.5,
+                "current_price": 50,
+                "title": "Product",
+                "discount_percent": 30,
+            }
+        ]
+
+        with patch("src.agents.deal_finder.notification_service") as mock_service:
+            mock_service.format_deal_report_html = MagicMock(
+                return_value="<html>Report</html>"
+            )
+            result = await agent.generate_report(deals, "Test Filter", "Summary")
+            assert result == "<html>Report</html>"
+            mock_service.format_deal_report_html.assert_called_once()
+
+
+class TestRunDailySearch:
+    @pytest.mark.asyncio
+    async def test_run_daily_search_processes_filters(
+        self, agent, sample_filter_config
+    ):
+        with (
+            patch.object(agent, "search_deals", new_callable=AsyncMock) as mock_search,
+            patch.object(
+                agent, "_index_deal_to_elasticsearch", new_callable=AsyncMock
+            ) as mock_index,
+            patch("src.agents.deal_finder.notification_service") as mock_service,
+        ):
+            mock_search.return_value = []
+            mock_index.return_value = True
+            mock_service.format_deal_report_html = MagicMock(
+                return_value="<html>Report</html>"
+            )
+
+            filters = [sample_filter_config, sample_filter_config]
+            result = await agent.run_daily_search(filters)
+
+            assert result["filters_processed"] == 2
+            assert "results" in result
+
+
+class TestDealSorting:
+    def test_deals_sorted_by_score_descending(self, agent):
+        deals = [
+            {
+                "asin": "B001",
+                "discount_percent": 20,
+                "rating": 4.0,
+                "sales_rank": 1000,
+                "current_price": 100,
+            },
+            {
+                "asin": "B002",
+                "discount_percent": 50,
+                "rating": 4.0,
+                "sales_rank": 1000,
+                "current_price": 100,
+            },
+            {
+                "asin": "B003",
+                "discount_percent": 30,
+                "rating": 4.0,
+                "sales_rank": 1000,
+                "current_price": 100,
+            },
+        ]
+
+        scored = [agent._score_deal(deal) for deal in deals]
+        scored.sort(key=lambda x: x["deal_score"], reverse=True)
+
+        assert scored[0]["discount_percent"] == 50
+        assert scored[1]["discount_percent"] == 30
+        assert scored[2]["discount_percent"] == 20
+
+
+class TestDealFinderGlobal:
+    def test_deal_finder_instance_exists(self):
+        assert deal_finder is not None
+        assert isinstance(deal_finder, DealFinderAgent)

@@ -5,7 +5,7 @@ Uses SQLAlchemy with async support for PostgreSQL
 
 import uuid
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from enum import Enum
 
 from sqlalchemy import (
@@ -25,7 +25,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.future import select
-from config import get_settings
+from src.config import get_settings
 
 
 # Create async engine
@@ -78,8 +78,10 @@ class WatchedProduct(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     asin = Column(String(10), nullable=False, index=True)
+    product_name = Column(String(500), nullable=True)
     target_price = Column(Float, nullable=False)
     current_price = Column(Float, nullable=True)
+    volatility_score = Column(Float, nullable=True, default=0.0)
     status = Column(SQLEnum(WatchStatus), default=WatchStatus.ACTIVE)
     last_checked_at = Column(DateTime, nullable=True)
     last_price_change = Column(DateTime, nullable=True)
@@ -130,6 +132,9 @@ class PriceAlert(Base):
     )
     triggered_price = Column(Float, nullable=False)
     target_price = Column(Float, nullable=False)
+    old_price = Column(Float, nullable=True)
+    new_price = Column(Float, nullable=True)
+    discount_percent = Column(Float, nullable=True)
     status = Column(SQLEnum(AlertStatus), default=AlertStatus.PENDING)
     triggered_at = Column(DateTime, default=datetime.utcnow)
     sent_at = Column(DateTime, nullable=True)
@@ -172,6 +177,37 @@ class DealReport(Base):
     deals_data = Column(JSON, nullable=True)
     generated_at = Column(DateTime, default=datetime.utcnow)
     sent_at = Column(DateTime, nullable=True)
+
+
+class CollectedDeal(Base):
+    """
+    Raw deal data collected from Keepa API.
+    Stored in PostgreSQL for historical analysis and finding bargains.
+    """
+
+    __tablename__ = "collected_deals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    asin = Column(String(10), nullable=False, index=True)
+    title = Column(String(500), nullable=True)
+    current_price = Column(Float, nullable=False)
+    original_price = Column(Float, nullable=True)
+    discount_percent = Column(Float, nullable=True)
+    rating = Column(Float, nullable=True)
+    review_count = Column(Integer, nullable=True)
+    sales_rank = Column(Integer, nullable=True)
+    domain = Column(String(10), default="de")
+    category = Column(String(100), nullable=True)
+    url = Column(String(200), nullable=True)
+    prime_eligible = Column(Boolean, default=False)
+    deal_score = Column(Float, nullable=True)
+    collected_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        Index("idx_collected_deals_asin_collected", "asin", "collected_at"),
+        Index("idx_collected_deals_discount", "discount_percent"),
+        Index("idx_collected_deals_price", "current_price"),
+    )
 
 
 # Database operations
@@ -223,6 +259,15 @@ async def get_active_watches() -> List[WatchedProduct]:
             select(WatchedProduct).where(WatchedProduct.status == WatchStatus.ACTIVE)
         )
         return result.scalars().all()
+
+
+async def get_active_watch_count() -> int:
+    """Count active watches (for health/status endpoints)"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(WatchedProduct.id).where(WatchedProduct.status == WatchStatus.ACTIVE)
+        )
+        return len(result.scalars().all())
 
 
 async def update_watch_price(
@@ -290,3 +335,170 @@ async def mark_alert_sent(alert_id: str):
             alert.status = AlertStatus.SENT
             alert.sent_at = datetime.utcnow()
             await session.commit()
+
+
+async def soft_delete_watch(watch_id: str, user_id: str) -> bool:
+    """Soft delete a watch by marking it INACTIVE for a given user"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(WatchedProduct).where(
+                WatchedProduct.id == uuid.UUID(watch_id),
+                WatchedProduct.user_id == uuid.UUID(user_id),
+            )
+        )
+        watch = result.scalar_one_or_none()
+        if not watch:
+            return False
+
+        watch.status = WatchStatus.INACTIVE
+        watch.updated_at = datetime.utcnow()
+        await session.commit()
+        return True
+
+
+async def get_user_by_id(user_id: str) -> Optional[User]:
+    """Fetch a user by UUID"""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(User).where(User.id == uuid.UUID(user_id))
+        )
+        return result.scalar_one_or_none()
+
+
+async def get_active_deal_filters_with_users() -> List[dict]:
+    """Return active deal filters with their owning user for daily report dispatch."""
+    async with async_session_maker() as session:
+        stmt = (
+            select(DealFilter, User)
+            .join(User, DealFilter.user_id == User.id)
+            .where(DealFilter.is_active == True)
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+        return [{"filter": f, "user": u} for f, u in rows]
+
+
+async def get_pending_alerts_with_context() -> List[dict]:
+    """
+    Return pending alerts enriched with watch + user data so notification logic
+    can pick appropriate channels.
+    """
+    async with async_session_maker() as session:
+        stmt = (
+            select(PriceAlert, WatchedProduct, User)
+            .join(WatchedProduct, PriceAlert.watch_id == WatchedProduct.id)
+            .join(User, WatchedProduct.user_id == User.id)
+            .where(PriceAlert.status == AlertStatus.PENDING)
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+
+        enriched = []
+        for alert, watch, user in rows:
+            enriched.append(
+                {
+                    "alert": alert,
+                    "watch": watch,
+                    "user": user,
+                }
+            )
+        return enriched
+
+
+async def save_collected_deal(
+    asin: str,
+    title: str,
+    current_price: float,
+    original_price: float = None,
+    discount_percent: float = None,
+    rating: float = None,
+    review_count: int = None,
+    sales_rank: int = None,
+    domain: str = "de",
+    category: str = None,
+    url: str = None,
+    prime_eligible: bool = False,
+    deal_score: float = None,
+) -> CollectedDeal:
+    """
+    Save a collected deal to PostgreSQL for historical analysis.
+    """
+    async with async_session_maker() as session:
+        deal = CollectedDeal(
+            asin=asin,
+            title=title,
+            current_price=current_price,
+            original_price=original_price,
+            discount_percent=discount_percent,
+            rating=rating,
+            review_count=review_count,
+            sales_rank=sales_rank,
+            domain=domain,
+            category=category,
+            url=url,
+            prime_eligible=prime_eligible,
+            deal_score=deal_score,
+        )
+        session.add(deal)
+        await session.commit()
+        await session.refresh(deal)
+        return deal
+
+
+async def save_collected_deals_batch(deals: List[Dict]) -> int:
+    """
+    Save a batch of collected deals to PostgreSQL.
+    Returns the number of deals saved.
+    """
+    saved = 0
+    async with async_session_maker() as session:
+        for deal_data in deals:
+            try:
+                deal = CollectedDeal(
+                    asin=deal_data.get("asin", ""),
+                    title=deal_data.get("title", ""),
+                    current_price=deal_data.get("current_price", 0),
+                    original_price=deal_data.get("original_price"),
+                    discount_percent=deal_data.get("discount_percent"),
+                    rating=deal_data.get("rating"),
+                    review_count=deal_data.get("review_count"),
+                    sales_rank=deal_data.get("sales_rank"),
+                    domain=deal_data.get("domain", "de"),
+                    category=deal_data.get("category"),
+                    url=deal_data.get("url"),
+                    prime_eligible=deal_data.get("prime_eligible", False),
+                    deal_score=deal_data.get("deal_score"),
+                )
+                session.add(deal)
+                saved += 1
+            except Exception:
+                pass
+        await session.commit()
+    return saved
+
+
+async def get_best_deals(
+    min_discount: float = 30,
+    min_rating: float = 4.0,
+    max_price: float = 100,
+    limit: int = 50,
+) -> List[CollectedDeal]:
+    """
+    Get the best current deals from collected deals.
+    """
+    async with async_session_maker() as session:
+        from sqlalchemy import and_
+
+        result = await session.execute(
+            select(CollectedDeal)
+            .where(
+                and_(
+                    CollectedDeal.discount_percent >= min_discount,
+                    CollectedDeal.rating >= min_rating,
+                    CollectedDeal.current_price <= max_price,
+                )
+            )
+            .order_by(CollectedDeal.discount_percent.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())

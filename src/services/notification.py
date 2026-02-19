@@ -4,7 +4,8 @@ import aiosmtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from jinja2 import Template
-from config import get_settings
+import httpx
+from src.config import get_settings
 
 
 class NotificationService:
@@ -90,15 +91,22 @@ Keeper Team
     ) -> str:
         deals_html = ""
         for i, deal in enumerate(deals, 1):
+            url = deal.get("url", deal.get("amazonUrl", "#"))
+            rating = deal.get("rating", "N/A")
+            reviews = deal.get("reviews", deal.get("reviewCount", 0))
+            current_price = deal.get("current_price", deal.get("currentPrice", "N/A"))
+            discount = deal.get(
+                "discount_percent", deal.get("discountPercent", 0)
+            )
             deals_html += f"""
             <tr>
                 <td>{i}</td>
                 <td>
-                    <a href="{deal.get("amazonUrl", "#")}">{deal.get("title", "Unknown")}</a><br>
-                    ⭐ {deal.get("rating", "N/A")}/5 ({deal.get("reviewCount", 0)} reviews)
+                    <a href="{url}">{deal.get("title", "Unknown")}</a><br>
+                    ⭐ {rating}/5 ({reviews} reviews)
                 </td>
-                <td>{deal.get("currentPrice", "N/A")}€</td>
-                <td style="color:red; font-weight:bold">-{deal.get("discountPercent", 0)}%</td>
+                <td>{current_price}€</td>
+                <td style="color:red; font-weight:bold">-{discount}%</td>
             </tr>
             """
 
@@ -135,6 +143,40 @@ Keeper Team
         </body>
         </html>
         """
+
+    async def send_telegram(self, chat_id: str, text: str) -> Dict[str, Any]:
+        """Send Telegram message if configured; otherwise fail gracefully."""
+        token = self.settings.telegram_bot_token
+        if not token or not chat_id:
+            return {"success": False, "error": "Telegram not configured"}
+
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(url, json=payload)
+                if resp.status_code == 200 and resp.json().get("ok"):
+                    msg_id = resp.json().get("result", {}).get("message_id")
+                    return {"success": True, "messageId": f"tg_{msg_id}"}
+                return {"success": False, "error": resp.text}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def send_discord(self, webhook_url: str, content: str) -> Dict[str, Any]:
+        """Send Discord webhook if configured; otherwise fail gracefully."""
+        if not webhook_url:
+            return {"success": False, "error": "Discord not configured"}
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(webhook_url, json={"content": content})
+                if 200 <= resp.status_code < 300:
+                    return {
+                        "success": True,
+                        "messageId": f"dc_{datetime.utcnow().timestamp()}",
+                    }
+                return {"success": False, "error": resp.text}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 
 notification_service = NotificationService()

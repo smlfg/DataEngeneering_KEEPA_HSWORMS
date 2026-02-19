@@ -11,10 +11,19 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
 
-from keepa import Keepa
-from config import get_settings
+try:
+    from keepa import Keepa
+except ImportError:  # pragma: no cover - fallback for offline/test envs
+
+    class Keepa:  # type: ignore
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "keepa package not installed. Please install keepa>=1.5.0."
+            )
+
+
+from src.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +71,10 @@ class DealFilters:
     min_reviews: int = 10
     exclude_warehouses: bool = True
     sort: str = "SCORE"
+    min_discount: int = 20
+    max_discount: int = 90
+    min_price_cents: int = 500
+    max_price_cents: int = 50000
 
 
 @dataclass
@@ -103,6 +116,7 @@ class AsyncTokenBucket:
         self.tokens_available = tokens_per_minute
         self.last_refill = time.time()
         self.executor = executor or ThreadPoolExecutor(max_workers=4)
+        self._lock = asyncio.Lock()
 
     def refill(self) -> int:
         """
@@ -150,7 +164,7 @@ class AsyncTokenBucket:
         self, cost: int, max_wait: float = 120.0, check_interval: float = 5.0
     ) -> bool:
         """
-        Wait until enough tokens are available.
+        Wait until enough tokens are available (thread-safe via asyncio.Lock).
 
         Args:
             cost: Number of tokens needed
@@ -160,34 +174,35 @@ class AsyncTokenBucket:
         Returns:
             True if tokens obtained, False if timeout
         """
-        start_time = time.time()
+        async with self._lock:
+            start_time = time.time()
 
-        while True:
-            self.refill()
+            while True:
+                self.refill()
 
-            if self.tokens_available >= cost:
-                self.tokens_available -= cost
-                wait_time = time.time() - start_time
-                if wait_time > 1:
-                    logger.info(f"⏳ Waited {wait_time:.1f}s for tokens")
-                logger.info(
-                    f"📊 Token consumed: -{cost}, Remaining: {self.tokens_available}"
-                )
-                return True
+                if self.tokens_available >= cost:
+                    self.tokens_available -= cost
+                    wait_time = time.time() - start_time
+                    if wait_time > 1:
+                        logger.info(f"⏳ Waited {wait_time:.1f}s for tokens")
+                    logger.info(
+                        f"📊 Token consumed: -{cost}, Remaining: {self.tokens_available}"
+                    )
+                    return True
 
-            elapsed = time.time() - start_time
-            if elapsed >= max_wait:
-                logger.warning(f"⏰ Timeout waiting for tokens after {max_wait}s")
-                raise TokenInsufficientError(
-                    f"Timeout after {max_wait}s waiting for {cost} tokens. "
-                    f"Currently have {self.tokens_available} tokens."
-                )
+                elapsed = time.time() - start_time
+                if elapsed >= max_wait:
+                    logger.warning(f"⏰ Timeout waiting for tokens after {max_wait}s")
+                    raise TokenInsufficientError(
+                        f"Timeout after {max_wait}s waiting for {cost} tokens. "
+                        f"Currently have {self.tokens_available} tokens."
+                    )
 
-            time_until_refill = self.refill_interval - (time.time() - self.last_refill)
-            wait_for = min(check_interval, time_until_refill)
+                time_until_refill = self.refill_interval - (time.time() - self.last_refill)
+                wait_for = min(check_interval, time_until_refill)
 
-            logger.info(f"⏳ Waiting {wait_for:.1f}s for token refill...")
-            await asyncio.sleep(wait_for)
+                logger.info(f"⏳ Waiting {wait_for:.1f}s for token refill...")
+                await asyncio.sleep(wait_for)
 
     def get_status(self) -> TokenStatus:
         """Get current token bucket status"""
@@ -210,22 +225,22 @@ class KeepaAPIClient:
     - Thread-safe operations
     - Proper error handling
 
-    Domain IDs: 1=US, 2=UK, 3=DE, 4=FR, 5=ES, 6=IT, 7=IN, 8=CA, 9=JP, 10=AU, 11=BR, 12=MX
+    Domain IDs: 1=US, 2=GB, 3=DE, 4=FR, 5=JP, 6=CA, 7=CN, 8=IT, 9=ES, 10=IN, 11=MX, 12=BR
     """
 
     DOMAIN_MAP = {
         1: "US",
-        2: "UK",
+        2: "GB",
         3: "DE",
         4: "FR",
-        5: "ES",
-        6: "IT",
-        7: "IN",
-        8: "CA",
-        9: "JP",
-        10: "AU",
-        11: "BR",
-        12: "MX",
+        5: "JP",
+        6: "CA",
+        7: "CN",
+        8: "IT",
+        9: "ES",
+        10: "IN",
+        11: "MX",
+        12: "BR",
     }
 
     # Token costs for different API calls (approximate)
@@ -246,16 +261,26 @@ class KeepaAPIClient:
         """
         settings = get_settings()
         self._api_key = api_key or settings.keepa_api_key
+        self._init_error: Optional[str] = None
 
         # Initialize Keepa API
-        try:
-            self._api = Keepa(self._api_key)
-            self._is_initialized = True
-            logger.info("✅ Keepa API initialized successfully")
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize Keepa API: {e}")
+        if not self._api_key:
             self._api = None
             self._is_initialized = False
+            self._init_error = (
+                "Missing KEEPA_API_KEY. Set KEEPA_API_KEY in your .env file."
+            )
+            logger.error(f"❌ Failed to initialize Keepa API: {self._init_error}")
+        else:
+            try:
+                self._api = Keepa(self._api_key)
+                self._is_initialized = True
+                logger.info("✅ Keepa API initialized successfully")
+            except Exception as e:
+                self._init_error = str(e)
+                logger.error(f"❌ Failed to initialize Keepa API: {e}")
+                self._api = None
+                self._is_initialized = False
 
         # Initialize token bucket with default values
         # Will be updated from actual API status
@@ -264,10 +289,51 @@ class KeepaAPIClient:
         # Thread pool for sync Keepa calls
         self._executor = ThreadPoolExecutor(max_workers=4)
 
+        # Cumulative token counter for session-level monitoring
+        self.total_tokens_consumed = 0
+
     def _ensure_initialized(self):
         """Ensure API is initialized before use"""
         if not self._is_initialized or self._api is None:
-            raise KeepaAPIError("Keepa API not initialized. Check API key.")
+            detail = self._init_error or "Check API key and keepa package installation."
+            raise KeepaAPIError(f"Keepa API not initialized. {detail}")
+
+    def _get_api_attr(self, *names: str, default=None):
+        """Read the first available attribute from the Keepa client object."""
+        if self._api is None:
+            return default
+        for name in names:
+            if hasattr(self._api, name):
+                return getattr(self._api, name)
+        return default
+
+    def _get_tokens_left(self) -> Optional[int]:
+        """Read token count across Keepa naming variants."""
+        if self._api is None:
+            return None
+
+        for name in ("tokens_left", "tokensLeft"):
+            try:
+                value = getattr(self._api, name)
+            except Exception:
+                continue
+
+            if value is None:
+                continue
+
+            if callable(value):
+                try:
+                    value = value()
+                except Exception:
+                    continue
+
+            if isinstance(value, (int, float, str)):
+                try:
+                    return int(value)
+                except Exception:
+                    continue
+
+        return None
 
     async def _sync_call(self, func, *args, **kwargs):
         """Run a synchronous Keepa API call in executor"""
@@ -286,7 +352,9 @@ class KeepaAPIClient:
                 self._token_bucket.refill_interval = refill_in
 
                 # Also update available tokens if available
-                tokens_left = self._api.tokens_left
+                tokens_left = self._get_api_attr(
+                    "tokensLeft", "tokens_left", default=None
+                )
                 if tokens_left is not None:
                     self._token_bucket.tokens_available = tokens_left
 
@@ -296,12 +364,13 @@ class KeepaAPIClient:
         except Exception as e:
             logger.warning(f"⚠️ Could not update token status: {e}")
 
-    async def query_product(self, asin: str) -> Dict[str, Any]:
+    async def query_product(self, asin: str, domain_id: int = 3) -> Dict[str, Any]:
         """
         Query single product by ASIN with token management.
 
         Args:
             asin: Amazon product ASIN (10 characters)
+            domain_id: Keepa domain id (3=DE, 2=GB, 4=FR, 8=IT, 9=ES)
 
         Returns:
             dict with product data:
@@ -328,15 +397,24 @@ class KeepaAPIClient:
         if len(asin) != 10:
             raise InvalidAsin(f"Invalid ASIN: {asin}. Must be 10 characters.")
 
+        domain = self.DOMAIN_MAP.get(domain_id)
+        if not domain:
+            raise KeepaAPIError(f"Unsupported domain_id: {domain_id}")
+
         # Wait for tokens
         cost = self.TOKEN_COSTS["query"]
         await self._token_bucket.wait_for_tokens(cost)
+        self.total_tokens_consumed += cost
+        logger.info(f"Total tokens consumed this session: {self.total_tokens_consumed}")
 
         try:
             # Make API call
             products = await self._sync_call(
-                lambda: self._api.query(asin, domain=self.DOMAIN_MAP[3])
+                lambda: self._api.query(asin, domain=domain)
             )
+
+            # Sync token bucket with real Keepa API status
+            await self.update_token_status()
 
             if not products:
                 raise KeepaAPIError(f"No product found for ASIN: {asin}")
@@ -428,19 +506,27 @@ class KeepaAPIClient:
         # Wait for tokens
         cost = self.TOKEN_COSTS["deals"]
         await self._token_bucket.wait_for_tokens(cost)
+        self.total_tokens_consumed += cost
+        logger.info(f"Total tokens consumed this session: {self.total_tokens_consumed}")
 
         try:
             # Build deal search parameters
-            deal_params = {}
+            # Valid keys: page, domainId, excludeCategories, includeCategories,
+            # priceTypes, deltaRange, deltaPercentRange, deltaLastRange,
+            # salesRankRange, currentRange, minRating, isLowest, isLowestOffer,
+            # isOutOfStock, titleSearch, isRangeEnabled, isFilterEnabled,
+            # hasReviews, filterErotic, sortType, dateRange
+            deal_params = {
+                "page": filters.page,
+                "domainId": filters.domain_id,
+                "hasReviews": filters.min_reviews > 0,
+                "isFilterEnabled": True,
+                "isRangeEnabled": True,
+                "deltaPercentRange": [filters.min_discount, filters.max_discount],
+                "currentRange": [filters.min_price_cents, filters.max_price_cents],
+            }
 
-            if filters.min_rating > 0:
-                deal_params["minRating"] = int(filters.min_rating * 20)
-
-            if filters.min_reviews > 0:
-                deal_params["reviews"] = filters.min_reviews
-
-            if filters.page > 0:
-                deal_params["page"] = filters.page
+            # Note: minRating crashes keepa lib — filter locally instead
 
             if filters.include_categories:
                 deal_params["includeCategories"] = filters.include_categories
@@ -458,37 +544,88 @@ class KeepaAPIClient:
                 )
             )
 
-            # Parse deals
+            # Parse deals — Keepa returns deals in 'dr' key
+            # 'current' array indices: 0=Amazon, 1=New3rdParty, 4=ListPrice, 7=New FBA
+            # 'deltaPercent' array indices match 'current' — [0] = Amazon price change %
+            # Prices are in cents, -1 means N/A
             deals = []
-            if result and "deals" in result:
-                for deal in result["deals"]:
-                    deals.append(
-                        {
-                            "asin": deal.get("asin", ""),
-                            "title": deal.get("title", "Unknown"),
-                            "current_price": deal.get("price", 0) / 100.0,
-                            "list_price": deal.get("listPrice", deal.get("price", 0))
-                            / 100.0,
-                            "discount_percent": deal.get("savingsPercent", 0),
-                            "rating": (deal.get("rating", 0) / 20.0)
-                            if deal.get("rating")
-                            else 0,
-                            "prime_eligible": deal.get("isPrime", False),
-                            "reviews": deal.get("reviews", 0),
-                            "url": f"https://amazon.{self.DOMAIN_MAP.get(filters.domain_id, 'de')}/dp/{deal.get('asin', '')}",
-                        }
-                    )
+            deal_list = result.get("dr", []) if result else []
+            for deal in deal_list:
+                cur = deal.get("current", [])
+
+                # Best available price: Amazon (0) > New FBA (7) > New 3rd party (1)
+                price = 0
+                for idx in [0, 7, 1]:
+                    if isinstance(cur, list) and len(cur) > idx and cur[idx] > 0:
+                        price = cur[idx] / 100.0
+                        break
+
+                # List price at index 4
+                list_price = 0
+                if isinstance(cur, list) and len(cur) > 4 and cur[4] > 0:
+                    list_price = cur[4] / 100.0
+
+                if list_price <= 0:
+                    list_price = price
+
+                # Discount from deltaPercent (first relevant index)
+                delta_pct = deal.get("deltaPercent", [])
+                discount = 0
+                if isinstance(delta_pct, list) and len(delta_pct) > 0:
+                    for row in delta_pct:
+                        if isinstance(row, list) and len(row) > 0 and row[0] != 0:
+                            discount = abs(row[0])
+                            break
+                        elif isinstance(row, (int, float)) and row > 0:
+                            discount = abs(row)
+                            break
+
+                # Fallback: calculate from prices
+                if (
+                    discount == 0
+                    and list_price > 0
+                    and price > 0
+                    and list_price > price
+                ):
+                    discount = round((1 - price / list_price) * 100, 1)
+
+                # Rating from current array index 16
+                rating = 0
+                if isinstance(cur, list) and len(cur) > 16 and cur[16] > 0:
+                    rating = cur[16] / 10.0
+
+                # Review count from current array index 17
+                reviews = 0
+                if isinstance(cur, list) and len(cur) > 17 and cur[17] > 0:
+                    reviews = cur[17]
+
+                if price <= 0:
+                    continue
+
+                deals.append(
+                    {
+                        "asin": deal.get("asin", ""),
+                        "title": deal.get("title", "Unknown"),
+                        "current_price": price,
+                        "list_price": list_price,
+                        "discount_percent": discount,
+                        "rating": rating,
+                        "prime_eligible": False,
+                        "reviews": reviews,
+                        "url": f"https://amazon.de/dp/{deal.get('asin', '')}",
+                    }
+                )
 
             return {
                 "deals": deals,
-                "total": result.get("totalDeals", len(deals)),
+                "total": len(deal_list),
                 "page": filters.page,
-                "category_names": result.get("categoryNames", []),
+                "category_names": result.get("categoryNames", []) if result else [],
             }
 
         except Exception as e:
             error_msg = str(e).upper()
-            tokens_left = self._api.tokens_left if self._api else 0
+            tokens_left = self._get_tokens_left()
 
             if "REQUEST_REJECTED" in error_msg or tokens_left == 0:
                 raise TokenLimitError(
@@ -511,6 +648,8 @@ class KeepaAPIClient:
         # Wait for tokens
         cost = self.TOKEN_COSTS["query"]
         await self._token_bucket.wait_for_tokens(cost)
+        self.total_tokens_consumed += cost
+        logger.info(f"Total tokens consumed this session: {self.total_tokens_consumed}")
 
         try:
             products = await self._sync_call(
@@ -556,6 +695,9 @@ class KeepaAPIClient:
             "last_refill": datetime.fromtimestamp(status.last_refill).isoformat(),
             "refill_interval": status.refill_interval,
             "time_until_refill": status.time_until_refill(),
+            "initialized": self._is_initialized,
+            "init_error": self._init_error,
+            "total_tokens_consumed": self.total_tokens_consumed,
         }
 
     def check_rate_limit(self) -> Dict[str, Any]:
@@ -563,8 +705,13 @@ class KeepaAPIClient:
         self._ensure_initialized()
 
         try:
-            tokens_left = self._api.tokens_left
-            refill_time = getattr(self._api, "time_to_refill", 0)
+            tokens_left = self._get_tokens_left()
+            refill_time = self._get_api_attr(
+                "time_to_refill",
+                "timeToRefill",
+                "refillIn",
+                default=0,
+            )
 
             if callable(refill_time):
                 try:
@@ -572,8 +719,13 @@ class KeepaAPIClient:
                 except:
                     refill_time = 0
 
+            try:
+                refill_time = int(refill_time or 0)
+            except Exception:
+                refill_time = 0
+
             return {
-                "tokens_available": tokens_left,
+                "tokens_available": tokens_left if tokens_left is not None else 0,
                 "tokens_per_minute": 20,
                 "refill_in_seconds": refill_time,
                 "refill_in_minutes": refill_time // 60 if refill_time else 0,
@@ -586,9 +738,8 @@ class KeepaAPIClient:
             }
 
 
-# Singleton instances
+# Singleton instance
 _keepa_client: Optional[KeepaAPIClient] = None
-_legacy_client: Optional["_LegacyKeepaClient"] = None
 
 
 def get_keepa_client() -> KeepaAPIClient:
@@ -597,54 +748,3 @@ def get_keepa_client() -> KeepaAPIClient:
     if _keepa_client is None:
         _keepa_client = KeepaAPIClient()
     return _keepa_client
-
-
-class _LegacyKeepaClient:
-    """Legacy wrapper for backward compatibility with async support"""
-
-    def __init__(self):
-        self._client = KeepaAPIClient()
-        self._executor = ThreadPoolExecutor(max_workers=2)
-
-    async def query_product(self, asin: str) -> Optional[Dict[str, Any]]:
-        """Query product by ASIN"""
-        try:
-            return await self._client.query_product(asin)
-        except Exception as e:
-            logger.error(f"Error querying product: {e}")
-            return None
-
-    async def query_deals(self, **kwargs) -> List[Dict[str, Any]]:
-        """Query deals"""
-        try:
-            filters = DealFilters(
-                page=kwargs.get("page", 0),
-                domain_id=kwargs.get("domain_id", 3),
-                min_rating=int(kwargs.get("min_rating", 4)),
-                min_reviews=kwargs.get("min_reviews", 10),
-            )
-            result = await self._client.search_deals(filters)
-            return result.get("deals", [])
-        except Exception as e:
-            logger.error(f"Error querying deals: {e}")
-            return []
-
-    def get_rate_limit_status(self) -> Dict[str, int]:
-        """Get rate limit status"""
-        try:
-            status = self._client.get_token_status()
-            return {"remaining": status.get("tokens_available", 0)}
-        except Exception:
-            return {"remaining": 0}
-
-
-def get_keepa_client_legacy() -> _LegacyKeepaClient:
-    """Get or create the legacy Keepa client singleton"""
-    global _legacy_client
-    if _legacy_client is None:
-        _legacy_client = _LegacyKeepaClient()
-    return _legacy_client
-
-
-# Export the legacy keepa_client for compatibility
-keepa_client = get_keepa_client_legacy()

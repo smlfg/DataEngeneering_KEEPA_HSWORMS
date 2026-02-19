@@ -1,4 +1,4 @@
-from services.keepa_api import keepa_client
+from src.services.keepa_api import get_keepa_client
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 
@@ -11,7 +11,7 @@ class PriceMonitorAgent:
     async def fetch_prices(self, asins: List[str]) -> List[Dict[str, Any]]:
         results = []
         for asin in asins:
-            price_data = await keepa_client.query_product(asin)
+            price_data = await get_keepa_client().query_product(asin)
             if price_data:
                 results.append(price_data)
         return results
@@ -41,7 +41,7 @@ class PriceMonitorAgent:
                 asin = watch["asin"]
                 target_price = watch["target_price"]
 
-                result = await keepa_client.query_product(asin)
+                result = await get_keepa_client().query_product(asin)
 
                 if result:
                     current_price = result.get("current_price", 0)

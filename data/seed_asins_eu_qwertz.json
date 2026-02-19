@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-02-19T01:08:02.897449+00:00",
+  "stats": {
+    "requests_total": 33,
+    "requests_query": 20,
+    "requests_search": 13,
+    "requests_bestsellers": 0,
+    "requests_product": 0,
+    "request_errors": 33,
+    "tokens_consumed_total": 0,
+    "finder_asins": 0,
+    "bestseller_asins": 0,
+    "validated_checked": 0,
+    "validated_ok": 0
+  },
+  "run": {
+    "markets": [
+      "UK",
+      "FR",
+      "IT",
+      "ES"
+    ],
+    "seed_limit": 1000,
+    "finder_pages": 10,
+    "finder_per_page": 600,
+    "max_categories": 100,
+    "bestseller_ranges": [
+      0,
+      30,
+      60,
+      90,
+      120,
+      150,
+      180
+    ],
+    "min_price": 8.0,
+    "max_price": 800.0,
+    "validate_count": 0,
+    "category_ids_by_market": {
+      "UK": [],
+      "FR": [],
+      "IT": [],
+      "ES": []
+    },
+    "discovered_unique_total": 0
+  },
+  "asins": [],
+  "records": []
+}
