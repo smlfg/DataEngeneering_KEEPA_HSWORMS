@@ -1,0 +1,12 @@
+Close P0 exam gaps: README quickstart, ARCHITECTURE.md, field schema tests, checklist
+
+- G2: Add TestNormalizeDeal tests verifying camelCase→snake_case normalization
+- G3: Rewrite README with prerequisites, 3-step quickstart, verification commands,
+  complete API endpoints table (14 endpoints), remove stale Redis references
+- G4: Create docs/ARCHITECTURE.md with ASCII diagram, tech decisions with reasoning,
+  trade-offs, 5 examiner Q&A, 10-minute presentation storyline
+- G5: Fill Abnahme-Checkliste M1-M10 with concrete evidence and demo sentences
+- Fix .env.example: remove REDIS_URL (Redis not in system)
+- Fix GitHub repo description: PostgreSQL instead of Redis
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>

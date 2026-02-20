@@ -1,0 +1,4 @@
+0000000000000000000000000000000000000000 255d0232543dfbe15a2c1defa6fbef1ec0f89a77 Samuel Fleig <smlflg@gmail.com> 1770136487 +0100	commit (initial): Initial commit: Add README.md
+255d0232543dfbe15a2c1defa6fbef1ec0f89a77 255d0232543dfbe15a2c1defa6fbef1ec0f89a77 Samuel Fleig <smlflg@gmail.com> 1770136497 +0100	Branch: renamed refs/heads/KeepaMainProjekt to refs/heads/KeepaMainProject
+255d0232543dfbe15a2c1defa6fbef1ec0f89a77 29c483957daf36ce6d00b0f56cdbf91ab6c84f1c Samuel Fleig <smlflg@gmail.com> 1770136652 +0100	commit: Setup KeepaMainProject branch
+29c483957daf36ce6d00b0f56cdbf91ab6c84f1c ea96bae2fee4140b42907034165446ee912921e1 Samuel Fleig <smlflg@gmail.com> 1770227611 +0100	pull: Fast-forward

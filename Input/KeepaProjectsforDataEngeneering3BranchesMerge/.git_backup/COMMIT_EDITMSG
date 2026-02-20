@@ -1,0 +1,15 @@
+feat: Kafka integration + ES Pipeline/Template/Alias + 3-Node cluster demo
+
+- Add Kafka (KRaft, 1 broker) to docker-compose.yml; ES memory 1g→512m
+- New docker-compose.cluster.yml: 3-Node ES + 3-Broker Kafka for exam demo
+- Add aiokafka>=0.9.0 to requirements.txt
+- src/config.py: kafka_bootstrap_servers setting
+- elasticsearch_service.py: _setup_ingest_pipeline, _setup_index_template, _setup_alias
+- New src/services/kafka_producer.py: async KeepaKafkaProducer
+- scheduler.py: fire-and-forget Kafka publish after ES indexing
+- New scripts/kafka_consumer_a.py (group=es-indexer) + kafka_consumer_b.py (group=arbitrage)
+- New README.md: Quickstart, Architecture, Consumer Demo, Cluster Demo, Verification Checklist
+- Expand .gitignore: __pycache__, *.pyc, .pytest_cache, .ruff_cache
+- Fix tests: @pytest.mark.asyncio, _load_targets patch, skip broken API class
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

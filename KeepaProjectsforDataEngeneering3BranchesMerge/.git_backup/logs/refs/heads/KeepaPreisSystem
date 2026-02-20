@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 255d0232543dfbe15a2c1defa6fbef1ec0f89a77 Samuel Fleig <smlflg@gmail.com> 1770136501 +0100	branch: Created from KeepaMainProject
+255d0232543dfbe15a2c1defa6fbef1ec0f89a77 d74f381035a1f02343f3e836d2554396ce671ef2 Samuel Fleig <smlflg@gmail.com> 1770136660 +0100	commit: Setup KeepaPreisSystem branch
+d74f381035a1f02343f3e836d2554396ce671ef2 8a6e54747c0068809d08af78b1b84c06ab46b8d2 Samuel Fleig <smlflg@gmail.com> 1770225031 +0100	commit: Add KeepaPreisSystem project files
+8a6e54747c0068809d08af78b1b84c06ab46b8d2 211dabde392722d294f8de78d03e5f951ad0e9ed Samuel Fleig <smlflg@gmail.com> 1770287935 +0100	reset: moving to origin/KeepaPreisSystem
+211dabde392722d294f8de78d03e5f951ad0e9ed d36a1557370b3a58e93c379b286ae3902674a9f7 Samuel Fleig <smlflg@gmail.com> 1771540182 +0100	commit: Implement Data Engineering pipeline: Kafka consumers, Token Bucket fix, parallel price checks
+d36a1557370b3a58e93c379b286ae3902674a9f7 5c67abcb6c29c8e181378e93bde1d6ac0befafcc Samuel Fleig <smlflg@gmail.com> 1771542284 +0100	commit: Close P0 exam gaps: README quickstart, ARCHITECTURE.md, field schema tests, checklist

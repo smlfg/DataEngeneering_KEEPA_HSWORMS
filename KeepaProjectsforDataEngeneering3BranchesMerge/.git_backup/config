@@ -1,0 +1,23 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[remote "old-origin"]
+	url = https://github.com/smlfg/KeepaProjectsforDataEngeneering3BranchesMerge
+	fetch = +refs/heads/*:refs/remotes/old-origin/*
+[branch "main"]
+	remote = old-origin
+	merge = refs/heads/main
+[branch "KeepaMainProject"]
+	remote = old-origin
+	merge = refs/heads/KeepaMainProject
+[branch "KeepaDealFinder"]
+	remote = old-origin
+	merge = refs/heads/KeepaDealFinder
+[branch "KeepaPreisSystem"]
+	remote = origin
+	merge = refs/heads/KeepaPreisSystem
+[remote "origin"]
+	url = https://github.com/smlfg/DataEngeneering_KEEPA_HSWORMS.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
