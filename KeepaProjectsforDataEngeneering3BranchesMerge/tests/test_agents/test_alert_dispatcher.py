@@ -256,7 +256,7 @@ class TestDispatchAlert:
     @pytest.mark.asyncio
     async def test_dispatch_alert_handles_failure_with_retry(self, agent, sample_alert):
         with patch("src.agents.alert_dispatcher.notification_service") as mock_service, \
-             patch("src.agents.alert_dispatcher.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+             patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             mock_service.format_price_alert = MagicMock(
                 return_value={"subject": "Alert", "body": "Body"}
             )

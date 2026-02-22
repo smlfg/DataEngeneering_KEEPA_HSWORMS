@@ -16,6 +16,7 @@ from src.utils.pipeline_logger import (
     KAFKA_PRODUCER,
     KAFKA_CONSUMER,
     ARBITRAGE,
+    PipelineStage,
     setup_logger,
     log_api_call,
     log_parser,
@@ -195,3 +196,40 @@ class TestLogArbitrage:
 
         call_kwargs = mock_log.info.call_args.kwargs
         assert call_kwargs["success"] is False
+
+    @patch("src.utils.pipeline_logger._log")
+    def test_logs_arbitrage_with_top_margin_eur_alias(self, mock_log):
+        log_arbitrage(opportunities_found=3, top_margin_eur=42.50)
+
+        call_kwargs = mock_log.info.call_args.kwargs
+        assert call_kwargs["output"]["margin_eur"] == 42.50
+        assert call_kwargs["output"]["opportunities_found"] == 3
+
+    @patch("src.utils.pipeline_logger._log")
+    def test_logs_arbitrage_margin_eur_takes_precedence(self, mock_log):
+        log_arbitrage(opportunities_found=1, margin_eur=10.0, top_margin_eur=99.0)
+
+        call_kwargs = mock_log.info.call_args.kwargs
+        assert call_kwargs["output"]["margin_eur"] == 10.0
+
+
+# =============================================================================
+# PipelineStage backward-compatibility class
+# =============================================================================
+
+
+class TestPipelineStage:
+    def test_has_core_stage_attributes(self):
+        assert PipelineStage.KEEPA_API == KEEPA_API
+        assert PipelineStage.PARSER == PARSER
+        assert PipelineStage.FILTER == FILTER
+        assert PipelineStage.ES_INDEX == ES_INDEX
+        assert PipelineStage.KAFKA_PRODUCER == KAFKA_PRODUCER
+        assert PipelineStage.KAFKA_CONSUMER == KAFKA_CONSUMER
+        assert PipelineStage.ARBITRAGE == ARBITRAGE
+
+    def test_has_extract_and_load(self):
+        assert hasattr(PipelineStage, "EXTRACT")
+        assert hasattr(PipelineStage, "LOAD")
+        assert PipelineStage.EXTRACT == "extract"
+        assert PipelineStage.LOAD == "load"

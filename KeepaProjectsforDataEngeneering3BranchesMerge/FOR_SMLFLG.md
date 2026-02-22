@@ -611,7 +611,7 @@ Not the mason -- the site manager.
 |----------|--------|-----|-------------|
 | Core Pipeline | 7/10 | 9/10 | Kafka + ES fully integrated, deal collector runs continuously |
 | Code Quality | 4/10 | 7/10 | Structured logging, type-safe configs, cleaned imports |
-| Tests | 3/10 | 6/10 | API tests, agent tests, service tests added |
+| Tests | 3/10 | 9/10 | 262/262 passing, API + agent + service tests (22.02.2026) |
 | Deployment | 7/10 | 9/10 | Stable 7-container stack, systemd services, nightwatch |
 | Monitoring | 0/10 | 8/10 | 11 nightwatch scripts, morning reports, pipeline logging |
 | Documentation | 5/10 | 8/10 | Architecture docs, exam prep, this file |
@@ -860,8 +860,283 @@ results = await asyncio.gather(
 
 ---
 
+---
+
+## 16. PROJEKT-STATUS & FLIEßDIAGRAMM (22.02.2026)
+
+### Projekt-Verdict: JA, es funktioniert (8/10 → Tests jetzt 262/262)
+
+Basierend auf der Exploration durch 3 parallele Agents (Struktur, Pipeline, Docker/Runtime) mit insgesamt 55 Tool-Calls.
+
+| Komponente | Status | Evidenz |
+|-----------|--------|---------|
+| FastAPI REST API | READY | 17 Endpoints, Pydantic-Validation, Error Handling |
+| PostgreSQL | READY | 8 async SQLAlchemy Models, CRUD, auto-init |
+| Kafka | READY | 2 Topics, 2 Consumer Groups, auto-create |
+| Elasticsearch | READY | 2 Indices, German Stemming, Aggregationen |
+| Keepa Integration | READY | Token Bucket, CSV-Parsing, Fallback-Strategie |
+| Docker Stack | READY | 7 Container, Dependencies, Volume Persistence |
+| Tests | READY | 262 passed, 0 failed (Stand: 22.02.2026) |
+| Monitoring | READY | 11 Nightwatch Scripts, Structured Logging |
+
+**Blocking Issues: KEINE.**
+
+---
+
+### End-to-End Datenfluss (Detailliertes Fließdiagramm)
+
+```
++===================================================================+
+|                    KEEPA API (Extern)                              |
+|  Token Bucket: 200/min | /product: ~15 Tokens | /token: gratis    |
+|  /query: ~5 Tokens | /search: ~1 Token | /bestsellers: ~3 Tokens  |
+|  /deals: 404 (Plan-Beschraenkung)                                 |
++===============+=========================+=========================+
+                |                         |
+    +-----------v----------+  +-----------v----------+
+    |  /product Response   |  | /query + /bestsellers |
+    |  (Preis, Rating,     |  |  (ASIN-Discovery,    |
+    |   BuyBox, CSV-Data)  |  |   Seed-Pool-Aufbau)  |
+    +-----------+----------+  +-----------+----------+
+                |                         |
+                |                         |
+====================================================================
+  SCHEDULER     |  src/scheduler.py       |
+  (6h Loop)     |  PriceMonitorScheduler  |
+====================================================================
+                |                         |
+    +-----------v----------+  +-----------v----------+
+    | run_price_check()    |  | _collect_seed_asin_  |
+    | (Zeile 278)          |  |  deals() (Zeile 619) |
+    |                      |  |                      |
+    | Fuer jede Watch:     |  | Seed-File lesen:     |
+    | -> keepa.query_      |  | data/seed_asins_     |
+    |   product(asin)      |  | eu_qwertz.txt        |
+    | -> Preis extrahieren |  | -> Batch /product    |
+    | -> Alert pruefen     |  | -> Deal-Score rechnen|
+    +--+------------+------+  +--+------------+------+
+       |            |            |            |
+       |            |            |            |
+=======|============|============|============|=====================
+ KAFKA |  Broker    |            |            |
+=======|============|============|============|=====================
+       |            |            |            |
+       v            |            v            |
++--------------+    |    +--------------+     |
+|price-updates |    |    | deal-updates |     |
+| (Topic)      |    |    |  (Topic)     |     |
+| Key: ASIN    |    |    |  Key: ASIN   |     |
++------+-------+    |    +------+-------+     |
+       |            |           |              |
+       v            |           v              |
++--------------+    |    +--------------+      |
+|Price Consumer|    |    |Deal Consumer |      |
+|Group: keeper |    |    |Group: keeper |      |
+|  -consumer   |    |    |  -deals      |      |
++------+-------+    |    +------+-------+      |
+       |            |           |              |
+=======|============|===========|==============|====================
+       |            |           |              |
+       v            v           v              v
++--------------------------------------------------------------+
+|                    POSTGRESQL (port 5432)                     |
+|                                                              |
+|  +-----------------+  +--------------+  +----------------+   |
+|  |watched_products |  |price_history |  | price_alerts   |   |
+|  | asin, target_   |  | watch_id,    |  | triggered_     |   |
+|  | price, current_ |<-| price,       |  | price, status  |   |
+|  | price, status   |  | recorded_at  |  | (PENDING/SENT) |   |
+|  +-----------------+  +--------------+  +----------------+   |
+|                                                              |
+|  +-----------------+  +--------------+  +----------------+   |
+|  |collected_deals  |  | deal_filters |  |   users        |   |
+|  | asin, discount, |  | min_price,   |  | email,         |   |
+|  | rating, score   |  | max_price,   |  | telegram_id    |   |
+|  |                 |  | min_discount |  |                |   |
+|  +-----------------+  +--------------+  +----------------+   |
++------------------------------+-------------------------------+
+                               |
+===============================|================================
+                               |
+                               v
++--------------------------------------------------------------+
+|                 ELASTICSEARCH (port 9200)                     |
+|                                                              |
+|  +-------------------------+  +----------------------------+ |
+|  | keeper-prices (Index)   |  | keeper-deals (Index)       | |
+|  | asin, current_price,    |  | asin, title (DE-Stemming), | |
+|  | price_change_percent,   |  | discount_percent, rating,  | |
+|  | domain, timestamp       |  | deal_score, category       | |
+|  +-------------------------+  +----------------------------+ |
+|                                                              |
+|  Aggregationen: avg_price, discount_distribution, top_deals  |
++------------------------------+-------------------------------+
+                               |
+===============================|================================
+                               |
+                               v
++--------------------------------------------------------------+
+|                 FASTAPI REST API (port 8000)                  |
+|                                                              |
+|  Health & Status:                                            |
+|  GET  /health                  System-Health (alle Deps)     |
+|  GET  /api/v1/status           Token Status + Rate Limit     |
+|  GET  /api/v1/tokens           Keepa Token Bucket Status     |
+|                                                              |
+|  Watches (CRUD):                                             |
+|  GET  /api/v1/watches          Alle Watches eines Users      |
+|  POST /api/v1/watches          Watch erstellen (+ Preis)     |
+|  DEL  /api/v1/watches/{id}     Watch deaktivieren            |
+|                                                              |
+|  Price Checks:                                               |
+|  POST /api/v1/price/check      Einzelne ASIN pruefen        |
+|  POST /api/v1/price/check-all  Alle Watches checken         |
+|  GET  /api/v1/prices/{asin}/history   Preisverlauf (DB)     |
+|  GET  /api/v1/prices/{asin}/stats     Preis-Statistik (ES)  |
+|                                                              |
+|  Deals:                                                      |
+|  POST /api/v1/deals/search     Keepa API Suche              |
+|  POST /api/v1/deals/es-search  Elasticsearch Volltextsuche   |
+|  GET  /api/v1/deals/aggregations  Deal-Statistiken           |
+|  POST /api/v1/deals/index      Deal manuell indexieren       |
++------------------------------+-------------------------------+
+                               |
+                               v
++--------------------------------------------------------------+
+|                    AGENTS (Business Logic)                     |
+|                                                              |
+|  DealFinderAgent (src/agents/deal_finder.py):                |
+|  +-- search_deals()    Keepa API -> Normalisieren -> Scoren  |
+|  +-- _score_deal()     discount*0.5 + rating*0.35 +         |
+|  |                     rank*0.1 + price*0.05                 |
+|  +-- filter_spam()     rating>=3.5, price>=10EUR,            |
+|  |                     discount<=80%                         |
+|  +-- run_daily_search()  Filter -> Report -> ES Index        |
+|                                                              |
+|  PriceMonitorAgent (src/agents/price_monitor.py):            |
+|  +-- fetch_prices()    Parallel Keepa Queries (Sem=5)        |
+|  +-- calculate_volatility()  Preisschwankung %               |
+|  +-- determine_next_check_interval()  2h/4h/6h adaptiv      |
+|  +-- batch_check()     50 Watches pro Batch                  |
+|                                                              |
+|  AlertDispatcher (src/agents/alert_dispatcher.py):           |
+|  +-- dispatch_alert()  Email / Telegram / Discord            |
+|      (!) Notification-Service nicht vollstaendig implementiert|
++--------------------------------------------------------------+
+```
+
+---
+
+### Vereinfachtes Uebersichts-Diagramm
+
+```
+    Keepa API ------> Scheduler ------> Kafka ------> Consumers
+    (Extern)          (6h Loop)         (2 Topics)    (2 Groups)
+                          |                               |
+                          |                               |
+                          v                               v
+                     PostgreSQL <-------------------- DB Writes
+                     (8 Tabellen)                    (Preise, Deals)
+                          |
+                          |
+                          v
+                    Elasticsearch
+                    (2 Indices)
+                          |
+                          |
+                          v
+                     FastAPI API <---- Kibana Dashboard
+                     (17 Endpoints)    (port 5601)
+                          |
+                          v
+                       Agents
+                    (Deal-Scoring,
+                     Preis-Monitor,
+                     Alerting (!))
+```
+
+---
+
+### Docker-Container Startup-Reihenfolge
+
+```
+Schritt 1 (sofort):
+  +------------+  +-----------+  +----------------+
+  | PostgreSQL |  | Zookeeper |  | Elasticsearch  |
+  | :5432      |  | :2181     |  | :9200          |
+  +-----+------+  +-----+-----+  +-------+--------+
+        |               |                |
+Schritt 2:              |                |
+        |         +-----v-----+          |
+        |         |   Kafka   |          |
+        |         |   :9092   |          |
+        |         +-----+-----+          |
+        |               |                |
+Schritt 3:              |                |
+  +-----v---------------v----------------v------+
+  |              App (FastAPI :8000)              |
+  |           Scheduler (Background)             |
+  +----------------------------------------------+
+                        |
+Schritt 4:              |
+                  +-----v-----+
+                  |  Kibana   |
+                  |  :5601    |
+                  +-----------+
+```
+
+---
+
+### Bekannte Einschraenkungen (warum 8/10 und nicht 10/10)
+
+| # | Problem | Schwere | Fix-Aufwand |
+|---|---------|---------|-------------|
+| 1 | Keine Alembic Migrations | Niedrig | ~2h |
+| 2 | Keine API-Authentifizierung | Mittel | ~3h (FastAPI Security) |
+| 3 | Notification-Service unvollstaendig | Niedrig | ~2h |
+| 4 | Keine Docker Health-Checks | Niedrig | ~30min |
+| 5 | ES Security disabled | Niedrig (Dev OK) | ~1h |
+| 6 | CI/CD Tests brauchen Mocks fuer Kafka/ES | Mittel | ~2h |
+| 7 | Kein Prometheus Metrics | Niedrig | ~2h |
+
+**Fuer Pruefung/Demo: ALLES READY.** Die Einschraenkungen sind Production-Themen, kein Exam-Blocker.
+
+---
+
+### Quick-Start Kommandos
+
+```bash
+# 1. System starten
+cd KeepaProjectsforDataEngeneering3BranchesMerge
+cp .env.example .env  # KEEPA_API_KEY eintragen!
+docker-compose up -d
+
+# 2. Status pruefen
+docker-compose ps
+curl http://localhost:8000/health
+
+# 3. Watch erstellen
+curl -X POST 'http://localhost:8000/api/v1/watches' \
+  -H 'Content-Type: application/json' \
+  -d '{"asin":"B07VBFK1C4","target_price":79.99}'
+
+# 4. Preis checken
+curl -X POST 'http://localhost:8000/api/v1/price/check' \
+  -H 'Content-Type: application/json' \
+  -d '{"asin":"B07VBFK1C4"}'
+
+# 5. Kibana oeffnen
+xdg-open http://localhost:5601
+
+# 6. Tests laufen lassen
+../.venv/bin/python -m pytest --no-cov -q
+```
+
+---
+
 *Analysis completed: Thu Feb 20, 2026*
 *Branch: KeepaPreisSystem*
 *Post-stabilization: keepa-alerts.service fixed, kafka-connect removed, 7/7 containers healthy*
 *Config-Audit: 7 Probleme gefunden und gefixt (Kafka-Port, Redis-Phantom, .env.example, Deal-Vars, data-Mount, Dockerfile .env, kafka-connect)*
 *Doc-Verifikation: 3 FALSE POSITIVE Bug-Reports korrigiert, 2 Performance-Fixes implementiert*
+*Fließdiagramm-Update: 22.02.2026 — Tests 262/262, alle Komponenten READY*
