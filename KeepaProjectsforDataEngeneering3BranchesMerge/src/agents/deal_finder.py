@@ -18,28 +18,19 @@ class DealFinderAgent:
     DROPSHIPPER_KEYWORDS = ["dropship", "fast shipping", "free shipping"]
     MIN_PRICE_THRESHOLD = 10.0
 
-    # Curated starter set for product-only deal discovery.
+    # QWERTZ Keyboard seed ASINs for Amazon.de deal discovery.
+    # Loaded from data/seed_asins_eu_qwertz.txt at runtime when available.
     DEFAULT_SEED_ASINS = [
-        "B09V3KXJPB",
-        "B08N5WRWNW",
-        "B09G9FPHY6",
-        "B07W7Q58J7",
-        "B07YCVP83F",
-        "B08D3Q2YQQ",
-        "B09MKNQ7X4",
-        "B08L5VJ9R7",
-        "B09BF5PBN5",
-        "B08HK3Z68M",
-        "B07PGL2ZSL",
-        "B09N7R4MQL",
-        "B09B8V1LZ3",
-        "B08XJGNQS7",
-        "B09FXYV8P9",
-        "B08W5FWFDM",
-        "B0B3M9Y7VS",
-        "B08VJ6JX9L",
-        "B0B6Q5M2DZ",
-        "B09Q5X3S7T",
+        "B005EOWBHC",  # Logitech K120 QWERTZ
+        "B00F34GN18",  # Cherry Stream Keyboard
+        "B0058UR5GS",  # Cherry KC 1000
+        "B07W6JN8V8",  # Logitech K380
+        "B07VBFK1C4",  # Logitech MX Keys
+        "B09DFY1LKY",  # Logitech MX Mechanical
+        "B09FXYV8P9",  # Corsair K70 RGB
+        "B0B6BCXRDS",  # Razer BlackWidow V4
+        "B09V3KXJPB",  # Logitech MX Keys Mini
+        "B07W7Q58J7",  # Logitech K270 Wireless
     ]
 
     DOMAIN_CODE_MAP = {
@@ -268,7 +259,20 @@ class DealFinderAgent:
             logger.warning(f"Could not read seed file {path}: {e}")
             return []
 
-        return self._parse_seed_asins(content)
+        # Parse line-by-line, skip comments and blank lines
+        asins = []
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # Take first token (ASIN) in case of inline comments
+            token = line.split()[0].upper()
+            if len(token) == 10:
+                asins.append(token)
+
+        if asins:
+            logger.info("Loaded %d seed ASINs from %s", len(asins), path)
+        return asins
 
     def _select_candidate_asins(
         self, seed_asins: List[str], max_asins: int, start_offset: int
@@ -391,55 +395,60 @@ class DealFinderAgent:
         )
 
     async def search_deals(self, filter_config: Dict[str, Any]) -> List[Dict[str, Any]]:
-        seed_targets = self._get_seed_targets(filter_config)
-        if not seed_targets:
-            return []
+        """Search for deals using Keepa deals endpoint (returns real prices)."""
+        from src.services.keepa_api import DealFilters
 
-        max_asins = int(filter_config.get("max_asins", len(seed_targets)) or len(seed_targets))
-        start_offset = int(filter_config.get("start_offset", 0) or 0)
-        candidate_targets = self._select_candidate_targets(
-            seed_targets=seed_targets,
-            max_asins=max_asins,
-            start_offset=start_offset,
+        domain_id = self._normalize_domain_id(filter_config.get("domain_id", 3))
+        min_discount = int(filter_config.get("min_discount", 20) or 20)
+        max_discount = int(filter_config.get("max_discount", 90) or 90)
+        min_price = float(filter_config.get("min_price", 5) or 5)
+        max_price = float(filter_config.get("max_price", 500) or 500)
+        min_rating = float(filter_config.get("min_rating", 0) or 0)
+
+        # Pass category filter to restrict deals to specific product categories
+        categories = filter_config.get("categories")
+        include_categories = None
+        if categories:
+            include_categories = [int(c) for c in categories]
+
+        filters = DealFilters(
+            page=0,
+            domain_id=domain_id,
+            include_categories=include_categories,
+            min_discount=min_discount,
+            max_discount=max_discount,
+            min_price_cents=int(min_price * 100),
+            max_price_cents=int(max_price * 100),
+            min_reviews=0,
         )
 
+        try:
+            result = await get_keepa_client().search_deals(filters)
+        except Exception as e:
+            logger.warning("Deals API call failed: %s", e)
+            return []
+
+        raw_deals = result.get("deals", [])
+        market = self._domain_code(domain_id).upper()
+
         deals: List[Dict[str, Any]] = []
-        for target in candidate_targets:
-            asin = str(target.get("asin", "")).strip().upper()
-            domain_id = self._normalize_domain_id(target.get("domain_id", 3))
-            market = str(target.get("market", self._domain_code(domain_id))).upper()
-            try:
-                product = await get_keepa_client().query_product(asin, domain_id=domain_id)
-            except TypeError:
-                # Backward compatibility for mocked/stubbed clients without domain_id support.
-                product = await get_keepa_client().query_product(asin)
-            except Exception as e:
-                logger.warning(
-                    "Product query failed for %s (domain_id=%s): %s",
-                    asin,
-                    domain_id,
-                    e,
-                )
-                continue
-
-            if not product:
-                continue
-
-            deal = self._build_deal_from_product(
-                product,
-                domain_id=domain_id,
-                market=market,
-            )
-            normalized = self._normalize_deal(deal)
+        for raw in raw_deals:
+            raw["domain_id"] = domain_id
+            raw["domain"] = self._domain_code(domain_id)
+            raw["market"] = market
+            raw["source"] = "deals_api"
+            normalized = self._normalize_deal(raw)
             if not self._matches_filter(normalized, filter_config):
                 continue
-
+            if min_rating > 0 and normalized.get("rating", 0) < min_rating:
+                continue
             scored = self._score_deal(normalized)
             deals.append(scored)
 
         filtered = self.filter_spam(deals)
         filtered.sort(key=lambda x: x["deal_score"], reverse=True)
-        return filtered[: self.MAX_DEALS_PER_REPORT]
+        max_deals = int(filter_config.get("max_asins", self.MAX_DEALS_PER_REPORT) or self.MAX_DEALS_PER_REPORT)
+        return filtered[:max_deals]
 
     def _score_deal(self, deal: Dict[str, Any]) -> Dict[str, Any]:
         """Score a deal. Expects already-normalized input."""

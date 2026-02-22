@@ -7,6 +7,7 @@ import asyncio
 import csv
 import json
 import logging
+import os
 import signal
 import sys
 from datetime import datetime, timezone
@@ -33,6 +34,12 @@ from src.services.deal_scoring import get_deal_scoring_service
 from src.services.report_generator import get_report_generator
 from src.services.email_sender import get_email_sender
 from src.services.elasticsearch_service import get_elasticsearch_service
+from src.utils.pipeline_logger import (
+    log_filter,
+    log_es_index,
+    log_arbitrage,
+    log_targets,
+)
 
 
 # Configure logging
@@ -59,6 +66,11 @@ class DealOrchestrator:
         self.report_generator = get_report_generator()
         self.email_sender = get_email_sender()
         self.elasticsearch_service = get_elasticsearch_service()
+
+        # Seed file tracking for hot-reload
+        self._last_seed_mtime: float = 0.0
+        self._cached_targets: list[dict] = []
+        self._initial_load_done: bool = False
 
         # Stats tracking
         self.stats = {
@@ -375,6 +387,8 @@ class DealOrchestrator:
           3. DEAL_SEED_FILE JSON   (by_domain format → expanded to target list)
           4. hardcoded minimal defaults
         Returns list of {"asin": str, "domain_id": int, "market": str}
+
+        Auto-reloads when seed file changes (detected via mtime).
         """
         DOMAIN_EU = {"UK": 2, "DE": 3, "FR": 4, "IT": 8, "ES": 9, "AT": 16}
         settings = get_settings()
@@ -382,6 +396,21 @@ class DealOrchestrator:
 
         # Priority 1 – CSV targets file (domain-aware)
         csv_path = root / settings.deal_targets_file
+
+        # Check if seed file has been updated since last load
+        if csv_path.exists():
+            current_mtime = os.path.getmtime(csv_path)
+            if self._cached_targets and current_mtime == self._last_seed_mtime:
+                # File unchanged - return cached targets
+                return self._cached_targets
+            if current_mtime > self._last_seed_mtime:
+                # File has been updated - clear cache to force reload
+                self._cached_targets = []
+                logger.info(f"Seed file updated, will reload targets")
+        loaded_targets = []
+        validated_count = 0
+        domain_counts: dict[int, int] = {}
+
         if csv_path.exists():
             try:
                 targets = []
@@ -413,6 +442,9 @@ class DealOrchestrator:
                                 "market": market,
                             }
                             targets.append(target)
+                            domain_counts[domain_id] = (
+                                domain_counts.get(domain_id, 0) + 1
+                            )
 
                             title = (row.get("title") or "").strip()
                             has_price = any(
@@ -426,27 +458,69 @@ class DealOrchestrator:
                             )
                             if title or has_price:
                                 validated_targets.append(target)
+                                validated_count += 1
 
                 if validated_targets:
                     logger.info(
                         f"🎯 Seed source: {settings.deal_targets_file} "
-                        f"({len(validated_targets)} validated targets)"
+                        f"({len(validated_targets)} validated targets, "
+                        f"domain_counts={dict(sorted(domain_counts.items()))})"
                     )
-                    return validated_targets
+                    loaded_targets = validated_targets
 
                 # If metadata columns exist but no row has title/price, treat file as raw/unvalidated.
-                if targets and has_metadata_columns:
+                elif targets and has_metadata_columns:
                     logger.warning(
                         f"⚠️  Ignoring raw target file {settings.deal_targets_file}: "
                         f"{len(targets)} rows but no validated title/price metadata."
                     )
+                    loaded_targets = targets
                 elif targets:
                     logger.info(
                         f"🎯 Seed source: {settings.deal_targets_file} ({len(targets)} targets)"
                     )
-                    return targets
+                    loaded_targets = targets
             except Exception as e:
                 logger.warning(f"Could not read targets CSV: {e}")
+
+        # Check if DE (domain_id=3) targets exist; if not, add fallback DE ASINs
+        de_count = domain_counts.get(3, 0)
+        if de_count == 0 and loaded_targets:
+            logger.warning(
+                f"⚠️  No DE (domain_id=3) targets found in {settings.deal_targets_file}. "
+                f"Found domains: {list(domain_counts.keys())}. "
+                f"Adding fallback DE QWERTZ ASINs to ensure DE deals are collected."
+            )
+            fallback_de_asins = [
+                "B08DG4C63H",  # Trust Taro - available in DE
+                "B00F35N1KS",  # CHERRY KC 1000
+                "B09N9CY637",  # CHERRY STREAM KEYBOARD TKL
+                "B08ZNSJ152",  # Dell KM5221W
+                "B003UL1RGC",  # Logitech K120
+            ]
+            for asin in fallback_de_asins:
+                loaded_targets.append(
+                    {
+                        "asin": asin,
+                        "domain_id": 3,  # DE
+                        "market": "DE",
+                    }
+                )
+            logger.info(f"➕ Added {len(fallback_de_asins)} fallback DE targets")
+
+        if loaded_targets:
+            # Cache targets and update modification time
+            if csv_path.exists():
+                self._last_seed_mtime = os.path.getmtime(csv_path)
+            self._cached_targets = loaded_targets
+            if not hasattr(self, "_initial_load_done") or not self._initial_load_done:
+                self._initial_load_done = True
+            else:
+                logger.info(
+                    f"Reloaded {len(loaded_targets)} ASINs from updated seed file"
+                )
+            log_targets(domain_counts)
+            return loaded_targets
 
         # Priority 2 – DEAL_SEED_ASINS env (expand to all 4 domains)
         if settings.deal_seed_asins:
@@ -579,6 +653,10 @@ class DealOrchestrator:
                                 f"  → {domain_name}: {len(deals)} deals "
                                 f"from {len(batch)} ASINs"
                             )
+                        else:
+                            logger.debug(
+                                f"  → {domain_name}: 0 deals from {len(batch)} ASINs: {batch[:3]}..."
+                            )
                     except NoDealAccessError as e:
                         logger.error(f"API plan limitation: {e}")
                         return
@@ -617,6 +695,16 @@ class DealOrchestrator:
                 for d in all_deals
                 if any(kw in (d.get("title") or "").lower() for kw in KEYBOARD_KEYWORDS)
             ]
+
+            # Log filter results for each deal
+            asins_in_keyboard = {d.get("asin") for d in keyboard_deals}
+            for d in all_deals:
+                asin = d.get("asin", "")
+                if asin in asins_in_keyboard:
+                    log_filter(asin=asin, filtered_in=True, reason="qwertz_keyword")
+                else:
+                    log_filter(asin=asin, filtered_in=False, reason="no_keyword_match")
+
             valid_deals = keyboard_deals if keyboard_deals else all_deals
 
             # Count by domain
@@ -641,6 +729,9 @@ class DealOrchestrator:
             result = await self.elasticsearch_service.index_deals(valid_deals)
             duration = (datetime.now(timezone.utc) - start_time).total_seconds()
             es_indexed = result.get("indexed", 0)
+            es_errors = result.get("errors", 0)
+
+            log_es_index(docs_indexed=es_indexed, errors=es_errors)
 
             if result["success"]:
                 logger.info(
@@ -748,6 +839,10 @@ class DealOrchestrator:
 
             if opportunities:
                 result = await self.elasticsearch_service.index_arbitrage(opportunities)
+                top_margin = max((o["margin_eur"] for o in opportunities), default=0.0)
+                log_arbitrage(
+                    opportunities_found=len(opportunities), top_margin_eur=top_margin
+                )
                 logger.info(
                     f"🏆 Arbitrage: {len(opportunities)} opportunities "
                     f"(errors: {result.get('errors', 0)})"
@@ -762,6 +857,7 @@ class DealOrchestrator:
                         f" | {opp['layout']}"
                     )
             else:
+                log_arbitrage(opportunities_found=0, top_margin_eur=0.0)
                 logger.info("📊 Arbitrage: no opportunities ≥ 15€ margin this cycle")
 
         except Exception as e:

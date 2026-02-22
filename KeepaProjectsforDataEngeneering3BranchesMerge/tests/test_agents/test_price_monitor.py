@@ -24,10 +24,12 @@ class TestPriceMonitorInit:
 class TestFetchPrices:
     @pytest.mark.asyncio
     async def test_fetch_prices_returns_list(self, agent):
-        with patch("src.agents.price_monitor.keepa_client") as mock_client:
+        with patch("src.agents.price_monitor.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
             mock_client.query_product = AsyncMock(
                 return_value={"asin": "B08N5WRWNW", "current_price": 89.99}
             )
+            mock_get_client.return_value = mock_client
 
             result = await agent.fetch_prices(["B08N5WRWNW"])
 
@@ -37,10 +39,12 @@ class TestFetchPrices:
 
     @pytest.mark.asyncio
     async def test_fetch_prices_skips_none_results(self, agent):
-        with patch("src.agents.price_monitor.keepa_client") as mock_client:
+        with patch("src.agents.price_monitor.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
             mock_client.query_product = AsyncMock(
                 side_effect=[None, {"asin": "B123", "current_price": 50.0}]
             )
+            mock_get_client.return_value = mock_client
 
             result = await agent.fetch_prices(["B000", "B123"])
 
@@ -52,10 +56,12 @@ class TestCheckPrices:
     async def test_check_prices_price_below_target_creates_alert(
         self, agent, sample_watch
     ):
-        with patch("src.agents.price_monitor.keepa_client") as mock_client:
+        with patch("src.agents.price_monitor.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
             mock_client.query_product = AsyncMock(
                 return_value={"asin": "B08N5WRWNW", "current_price": 90.0}
             )
+            mock_get_client.return_value = mock_client
 
             result = await agent.check_prices([sample_watch])
 
@@ -65,10 +71,12 @@ class TestCheckPrices:
 
     @pytest.mark.asyncio
     async def test_check_prices_price_above_target_no_alert(self, agent, sample_watch):
-        with patch("src.agents.price_monitor.keepa_client") as mock_client:
+        with patch("src.agents.price_monitor.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
             mock_client.query_product = AsyncMock(
                 return_value={"asin": "B08N5WRWNW", "current_price": 150.0}
             )
+            mock_get_client.return_value = mock_client
 
             result = await agent.check_prices([sample_watch])
 
@@ -77,8 +85,10 @@ class TestCheckPrices:
 
     @pytest.mark.asyncio
     async def test_check_prices_no_product_data_returns_none(self, agent, sample_watch):
-        with patch("src.agents.price_monitor.keepa_client") as mock_client:
+        with patch("src.agents.price_monitor.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
             mock_client.query_product = AsyncMock(return_value=None)
+            mock_get_client.return_value = mock_client
 
             result = await agent.check_prices([sample_watch])
 
@@ -87,8 +97,10 @@ class TestCheckPrices:
 
     @pytest.mark.asyncio
     async def test_check_prices_handles_api_error_gracefully(self, agent, sample_watch):
-        with patch("src.agents.price_monitor.keepa_client") as mock_client:
+        with patch("src.agents.price_monitor.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
             mock_client.query_product = AsyncMock(side_effect=Exception("API Error"))
+            mock_get_client.return_value = mock_client
 
             result = await agent.check_prices([sample_watch])
 
@@ -101,8 +113,10 @@ class TestBatchCheck:
     async def test_batch_check_iterates_over_watches(self, agent):
         watches = [{"asin": f"B{i:03d}", "target_price": 100.0} for i in range(55)]
 
-        with patch("src.agents.price_monitor.keepa_client") as mock_client:
+        with patch("src.agents.price_monitor.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
             mock_client.query_product = AsyncMock(return_value={"current_price": 150.0})
+            mock_get_client.return_value = mock_client
 
             result = await agent.batch_check(watches)
 

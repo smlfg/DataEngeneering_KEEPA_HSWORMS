@@ -370,15 +370,19 @@ class TestKeepaAPIClient:
         mock_settings.return_value = MagicMock(keepa_api_key="test_key")
         mock_api = MagicMock()
         mock_api.tokens_left = 20
+
+        # Build proper csv array: each index is [keepa_time, price_cents, ...]
+        csv_data = [None] * 20
+        csv_data[0] = [1234567890, 9999]    # Amazon price: 99.99 EUR
+        csv_data[4] = [1234567890, 12999]   # List price: 129.99 EUR
+        csv_data[11] = [1234567890, 8999]   # Buy box: 89.99 EUR
+
         mock_api.query.return_value = [
             {
                 "title": "Test Product",
-                "current": [1234567890, 9999],  # timestamp, price in cents
-                "listPrice": [1234567890, 12999],
-                "buyBoxPrice": [1234567890, 8999],
-                "rating": 45,  # 4.5 stars * 10
+                "rating": 45,  # 4.5 stars * 10 → normalized to 4.5
                 "offers": 5,
-                "csv": [[1, 2, 3]],
+                "csv": csv_data,
                 "categories": [123, 456],
             }
         ]
@@ -392,7 +396,7 @@ class TestKeepaAPIClient:
         assert result["current_price"] == 99.99
         assert result["list_price"] == 129.99
         assert result["buy_box_price"] == 89.99
-        assert result["rating"] == 45
+        assert result["rating"] == 4.5
         assert result["offers_count"] == 5
 
     @patch("src.services.keepa_api.get_settings")
@@ -583,7 +587,7 @@ class TestKeepaAPIClient:
     @patch("src.services.keepa_api.get_settings")
     @patch("src.services.keepa_api.Keepa")
     def test_check_rate_limit_handles_error(self, mock_keepa, mock_settings):
-        """check_rate_limit handles errors gracefully"""
+        """check_rate_limit handles errors gracefully when tokens_left raises"""
         mock_settings.return_value = MagicMock(keepa_api_key="test_key")
         mock_api = MagicMock()
         type(mock_api).tokens_left = PropertyMock(side_effect=Exception("API error"))
@@ -592,7 +596,8 @@ class TestKeepaAPIClient:
         client = KeepaAPIClient()
         result = client.check_rate_limit()
 
-        assert "error" in result
+        # _get_tokens_left catches the exception internally and returns None,
+        # so check_rate_limit returns tokens_available=0 without an error key
         assert result["tokens_available"] == 0
 
     @patch("src.services.keepa_api.get_settings")
@@ -650,11 +655,8 @@ class TestKeepaAPIClient:
         mock_settings.return_value = MagicMock(keepa_api_key="test_key")
         mock_api = MagicMock()
         mock_api.tokens_left = 25
-        mock_status = MagicMock()
-        mock_status.tokensPerMin = 30
-        mock_status.refillIn = 45
-        # status is a callable method that returns the status object
-        mock_api.status.return_value = mock_status
+        # status is a dict property (not a callable) set after each API call
+        mock_api.status = {"tokensPerMin": 30, "refillIn": 45}
         mock_keepa.return_value = mock_api
 
         client = KeepaAPIClient()

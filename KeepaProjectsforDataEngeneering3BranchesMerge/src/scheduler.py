@@ -21,6 +21,8 @@ from src.services.database import (
     get_active_deal_filters_with_users,
     save_collected_deals_batch,
     get_best_deals,
+    backfill_price_history_from_deals,
+    get_latest_deal_price,
 )
 from src.services.keepa_api import KeepaAPIClient, get_keepa_client
 from src.services.notification import notification_service
@@ -32,6 +34,13 @@ from src.agents.alert_dispatcher import alert_dispatcher
 from src.agents.deal_finder import deal_finder
 from src.config import get_settings
 
+try:
+    from src.utils.pipeline_logger import log_arbitrage
+
+    _PIPELINE_LOG = True
+except ImportError:
+    _PIPELINE_LOG = False
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -41,6 +50,75 @@ class PriceMonitorScheduler:
     Scheduler that runs automatic price checks.
     Default: Every 6 hours (21600 seconds)
     """
+
+    # Title keywords for post-filtering deals to actual keyboards.
+    # The Keepa deals API category filter (340843031) is too broad and
+    # returns general "Computer & Accessories" deals. This list catches
+    # keyboards in DE/EN/FR/IT/ES.
+    KEYBOARD_TITLE_KEYWORDS = [
+        "tastatur",
+        "keyboard",
+        "clavier",
+        "tastiera",
+        "teclado",
+        "qwertz",
+        "qwerty",
+        "mechanisch",
+        "mechanical",
+        "mecanique",
+        "meccanica",
+        "mecanico",
+        "keycap",
+        "key cap",
+        "cherry mx",
+        "gateron",
+        "kailh",
+        "hot-swap",
+        "hotswap",
+    ]
+
+    KEYBOARD_BRAND_WHITELIST = [
+        # Premium / Enthusiast
+        "logitech",
+        "cherry",
+        "corsair",
+        "razer",
+        "steelseries",
+        "hyperx",
+        "keychron",
+        "ducky",
+        "leopold",
+        "varmilo",
+        "das keyboard",
+        "filco",
+        "hhkb",
+        "topre",
+        "realforce",
+        # Gaming
+        "roccat",
+        "asus",
+        "msi",
+        "trust gaming",
+        # Mainstream
+        "microsoft",
+        "hp",
+        "dell",
+        "lenovo",
+        "apple",
+        "hama",
+        "perixx",
+        "jelly comb",
+        # Mechanisch-Spezialist
+        "glorious",
+        "wooting",
+        "nuphy",
+        "akko",
+        "epomaker",
+        "royal kludge",
+        "redragon",
+        "havit",
+        "iclever",
+    ]
 
     def __init__(
         self,
@@ -53,6 +131,16 @@ class PriceMonitorScheduler:
         self.keepa_client = KeepaAPIClient()
         self.running = False
 
+    def _is_keyboard_deal(self, deal: Dict[str, Any]) -> bool:
+        """Post-filter: check if deal title contains keyboard-related keywords."""
+        title = str(deal.get("title", "")).lower()
+        return any(kw in title for kw in self.KEYBOARD_TITLE_KEYWORDS)
+
+    def _has_whitelisted_brand(self, deal: Dict[str, Any]) -> bool:
+        """Post-filter: check if deal title contains a known keyboard brand."""
+        title = str(deal.get("title", "")).lower()
+        return any(brand in title for brand in self.KEYBOARD_BRAND_WHITELIST)
+
     async def check_single_price(self, watch) -> Dict[str, Any]:
         """Check price for a single watched product"""
         try:
@@ -60,7 +148,16 @@ class PriceMonitorScheduler:
 
             if result:
                 current_price = result.get("current_price", 0)
-                buy_box = result.get("buy_box_price", None)
+
+                # Fallback: Product API liefert keine Preise mit diesem Key
+                if current_price == 0:
+                    deal_price = await get_latest_deal_price(watch.asin)
+                    if deal_price and deal_price > 0:
+                        current_price = deal_price
+                        logger.info(f"📊 DB-Fallback: {watch.asin} → {current_price}€")
+
+                buy_box_raw = result.get("buy_box_price", None)
+                buy_box = str(buy_box_raw) if buy_box_raw else None
 
                 previous_price = watch.current_price
                 price_change_percent = 0
@@ -81,7 +178,8 @@ class PriceMonitorScheduler:
                         watch.current_price is None
                         or abs(current_price - watch.current_price) > 0.01
                     ),
-                    "alert_triggered": current_price <= watch.target_price,
+                    "alert_triggered": current_price > 0
+                    and current_price <= watch.target_price,
                 }
 
             return {
@@ -109,6 +207,14 @@ class PriceMonitorScheduler:
 
         await init_db()
 
+        # Backfill price history from existing collected deals
+        try:
+            backfilled = await backfill_price_history_from_deals()
+            if backfilled > 0:
+                logger.info(f"✅ Backfilled {backfilled} price history records")
+        except Exception as e:
+            logger.warning(f"Backfill skipped: {e}")
+
         # Phase 1: Start Kafka producers (must be ready before consumers)
         kafka_ready = False
         try:
@@ -130,7 +236,7 @@ class PriceMonitorScheduler:
         if kafka_ready:
             try:
                 self.price_consumer = PriceUpdateConsumer(async_session_maker)
-                self.deal_consumer = DealUpdateConsumer()
+                self.deal_consumer = DealUpdateConsumer(async_session_maker)
                 await self.price_consumer.start()
                 await self.deal_consumer.start()
                 self._consumer_tasks = [
@@ -207,12 +313,14 @@ class PriceMonitorScheduler:
             if isinstance(result, Exception):
                 logger.error(f"Error checking price for watch: {result}")
                 results["failed"] += 1
-                results["watches"].append({
-                    "watch_id": str(watches[i].id),
-                    "asin": watches[i].asin,
-                    "success": False,
-                    "error": str(result),
-                })
+                results["watches"].append(
+                    {
+                        "watch_id": str(watches[i].id),
+                        "asin": watches[i].asin,
+                        "success": False,
+                        "error": str(result),
+                    }
+                )
                 continue
 
             watch = watches[i]
@@ -226,6 +334,11 @@ class PriceMonitorScheduler:
 
                 if result.get("price_changed"):
                     results["price_changes"] += 1
+
+                # Skip 0€ prices — indicates no data, not a real price
+                if result["current_price"] <= 0:
+                    results["watches"].append(result)
+                    continue
 
                 # Send to Kafka for pipeline processing
                 kafka_result = await price_producer.send_price_update(
@@ -285,6 +398,10 @@ class PriceMonitorScheduler:
             f"{results['alerts_triggered']} alerts, {results['kafka_sent']} to Kafka, "
             f"{results['es_indexed']} in ES"
         )
+
+        # Pipeline logging: arbitrage stage
+        if _PIPELINE_LOG:
+            log_arbitrage(opportunities_found=results["alerts_triggered"])
 
         # Dispatch pending alerts with user/channel context
         try:
@@ -451,40 +568,91 @@ class PriceMonitorScheduler:
         )
         return {"reports_sent": reports_sent, "deals_indexed": deals_indexed}
 
+    def _load_seed_asins_from_file(self) -> list:
+        """Load QWERTZ keyboard ASINs from seed file."""
+        from pathlib import Path
+
+        seed_path = (
+            Path(__file__).resolve().parent.parent / "data" / "seed_asins_eu_qwertz.txt"
+        )
+        if not seed_path.exists():
+            logger.warning("Seed file not found: %s", seed_path)
+            return []
+
+        asins = []
+        for line in seed_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            asin = line.split()[0].upper()
+            if len(asin) == 10:
+                asins.append(asin)
+
+        logger.info("Loaded %d seed ASINs from %s", len(asins), seed_path)
+        return asins
+
+    async def _collect_seed_asin_deals(self, asins: list) -> list:
+        """Fallback: query individual seed ASINs via product API for current prices."""
+        semaphore = asyncio.Semaphore(5)
+
+        async def _query(asin: str):
+            async with semaphore:
+                result = await self.keepa_client.query_product(asin, domain_id=3)
+                if result and result.get("current_price", 0) > 0:
+                    deal = deal_finder._build_deal_from_product(
+                        result, domain_id=3, market="DE"
+                    )
+                    return deal_finder._score_deal(deal)
+                return None
+
+        raw = await asyncio.gather(
+            *[_query(a) for a in asins], return_exceptions=True
+        )
+        all_deals = []
+        for item in raw:
+            if isinstance(item, Exception):
+                logger.debug("Seed ASIN query failed: %s", item)
+            elif item is not None:
+                all_deals.append(item)
+        return all_deals
+
     async def collect_deals_to_elasticsearch(self):
         """
-        Background task: collect product-based deals and index to:
+        Background task: collect QWERTZ keyboard deals and index to:
         1. Elasticsearch (for search & analytics)
         2. Kafka (for event streaming)
         3. PostgreSQL (for historical analysis)
+
+        Strategy:
+        - Primary: Keepa deals API with keyboard category filter (340843031)
+        - Fallback: Query seed ASINs directly via product API
         """
-        logger.info("🔄 Deal collector started")
+        logger.info("🔄 QWERTZ Keyboard Deal collector started")
         logger.info(
             "Deal collector config: interval=%ss, batch_size=%s",
             self.settings.deal_scan_interval_seconds,
             self.settings.deal_scan_batch_size,
         )
 
-        # Different deal filters to maximize variety
+        # Amazon.de browse node for Tastaturen (Keyboards)
+        KEYBOARD_CATEGORY_ID = 340843031
+
+        # Keyboard-specific deal filters
         batch_size = max(1, int(self.settings.deal_scan_batch_size or 50))
         deal_configs = [
             {
-                "min_discount": 30,
+                "min_discount": 10,
                 "max_discount": 90,
-                "min_price": 10,
-                "max_price": 100,
-                "min_rating": 3,
-                "max_asins": batch_size,
-            },
-            {
-                "min_discount": 40,
-                "max_discount": 90,
-                "min_price": 20,
-                "max_price": 250,
-                "min_rating": 4,
+                "min_price": 15,
+                "max_price": 300,
+                "min_rating": 3.5,
+                "categories": [KEYBOARD_CATEGORY_ID],
                 "max_asins": batch_size,
             },
         ]
+
+        # Load seed ASINs for fallback
+        seed_asins = self._load_seed_asins_from_file()
 
         collection_cycle = 0
         seed_cursor = 0
@@ -496,8 +664,46 @@ class PriceMonitorScheduler:
                 config["start_offset"] = seed_cursor
                 all_deals = await deal_finder.search_deals(config)
 
+                # Post-filter: only keep deals with keyboard-related titles
+                if all_deals:
+                    before_filter = len(all_deals)
+                    all_deals = [d for d in all_deals if self._is_keyboard_deal(d)]
+                    filtered_out = before_filter - len(all_deals)
+                    if filtered_out > 0:
+                        logger.info(
+                            "Keyboard title filter: %d/%d kept, %d non-keyboard deals removed",
+                            len(all_deals),
+                            before_filter,
+                            filtered_out,
+                        )
+
+                # Brand whitelist filter: only keep known keyboard brands
+                if all_deals:
+                    before_brand = len(all_deals)
+                    all_deals = [d for d in all_deals if self._has_whitelisted_brand(d)]
+                    brand_filtered = before_brand - len(all_deals)
+                    if brand_filtered > 0:
+                        logger.info(
+                            "Brand whitelist filter: %d/%d kept, %d unknown brands removed",
+                            len(all_deals),
+                            before_brand,
+                            brand_filtered,
+                        )
+
+                # Fallback: if deals API returned nothing, query seed ASINs directly
+                if not all_deals and seed_asins:
+                    logger.info(
+                        "Deals API returned no keyboard deals, falling back to seed ASINs"
+                    )
+                    batch_start = seed_cursor % len(seed_asins)
+                    batch_end = min(batch_start + batch_size, len(seed_asins))
+                    batch = seed_asins[batch_start:batch_end]
+                    if not batch:
+                        batch = seed_asins[:batch_size]
+                    all_deals = await self._collect_seed_asin_deals(batch)
+
                 if not all_deals:
-                    logger.info("⚠️ No deals collected this cycle")
+                    logger.info("No keyboard deals collected this cycle")
                 else:
                     # 1. Index to Elasticsearch
                     es_indexed = 0
@@ -576,7 +782,7 @@ class PriceMonitorScheduler:
                     db_saved = await save_collected_deals_batch(db_ready_deals)
 
                     logger.info(
-                        f"📦 Deal collection #{collection_cycle + 1}: "
+                        f"📦 Keyboard deal collection #{collection_cycle + 1}: "
                         f"ES={es_indexed}, Kafka={kafka_sent}, DB={db_saved} deals"
                     )
 

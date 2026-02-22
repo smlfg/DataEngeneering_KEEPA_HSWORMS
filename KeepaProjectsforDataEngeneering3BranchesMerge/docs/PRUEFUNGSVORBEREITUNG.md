@@ -131,6 +131,18 @@ def _normalize_deal(self, deal: Dict[str, Any]) -> Dict[str, Any]:
 
 > Die Keepa API liefert Daten in unterschiedlichen Formaten je nach Endpunkt -- mal `currentPrice` (camelCase), mal `current_price` (snake_case). `_normalize_deal` ist der Uebersetzer: Es akzeptiert alle Varianten und produziert ein einheitliches Format mit berechneten Feldern wie `discount_percent`. Ohne Normalisierung muessten Scoring, Filtering und Elasticsearch-Indexing alle moeglichen Feldnamen kennen -- das waere unwartbar.
 
+### F6: "Eure project-deep-dive.md meldet 3 kritische Bugs. Sind die noch aktuell?"
+
+> Nein. Wir haben alle drei als Teil eines manuellen Code-Reviews untersucht und widerlegt:
+>
+> 1. **"Dual DB schemas"** — Das war ein Artefakt aus dem Git-Merge von 3 Branches. Der Sync-Stack existiert nur im `Input/`-Referenzordner und wird nirgendwo importiert. Die aktive Codebase nutzt ein einziges async Schema.
+>
+> 2. **"Missing await in deals endpoint"** — Alle `await`s sind korrekt. Der Deals-Endpoint nutzt den Product-API-Fallback (weil `/deals` auf unserem Keepa-Plan nicht verfuegbar ist), und der ist korrekt implementiert.
+>
+> 3. **"DELETE watch endpoint returns success without DB mutation"** — Der Endpoint macht ein echtes Soft-Delete: Er setzt `status = 'inactive'` und committed die Aenderung in die Datenbank.
+>
+> **Das zeigt eine wichtige Lektion:** Automatisierte Code-Reviews (auch von LLMs) muessen manuell verifiziert werden. Die Deep-Dive-Analyse wurde VOR der Branch-Konsolidierung erstellt und bezog sich teilweise auf Code der im finalen Merge nicht mehr aktiv war.
+
 ---
 
 ## Teil 3: Die "Warum"-Fragen zu jeder Technologie
@@ -258,6 +270,8 @@ Lies das hier **laut** 10 Minuten vor der Pruefung:
 8. **Kafka Offsets sind wie Lesezeichen -- bei Consumer-Crash wird ab dem letzten Offset weitergelesen.**
 9. **Elasticsearch laeuft als Single-Node weil unser Datenvolumen klein ist -- in Production waeren es 3+ Nodes.**
 10. **PostgreSQL ist Source of Truth, Elasticsearch ist der schnelle Suchindex -- bei ES-Ausfall verlieren wir keine Daten.**
+11. **Die project-deep-dive.md meldete 3 "HIGH"-Bugs — alle drei waren False Positives nach manueller Verifikation. Automatisierte Reviews muessen IMMER manuell geprueft werden.**
+12. **Performance-Fix: `price_monitor.py` und `scheduler.py` (_collect_seed_asin_deals) wurden von sequentiellen Loops auf `asyncio.gather()` + `Semaphore(5)` umgestellt — gleiche Logik, aber 5x schneller.**
 
 ---
 

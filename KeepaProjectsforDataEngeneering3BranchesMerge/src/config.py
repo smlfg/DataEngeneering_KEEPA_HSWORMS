@@ -65,3 +65,7 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
+
+def get_keepa_api_key() -> str:
+    return get_settings().keepa_api_key

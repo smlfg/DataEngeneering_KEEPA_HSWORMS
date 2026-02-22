@@ -1,3 +1,5 @@
+import asyncio
+
 from src.services.keepa_api import get_keepa_client
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
@@ -9,12 +11,14 @@ class PriceMonitorAgent:
     STABLE_THRESHOLD = 2.0
 
     async def fetch_prices(self, asins: List[str]) -> List[Dict[str, Any]]:
-        results = []
-        for asin in asins:
-            price_data = await get_keepa_client().query_product(asin)
-            if price_data:
-                results.append(price_data)
-        return results
+        semaphore = asyncio.Semaphore(5)
+
+        async def _fetch(asin: str):
+            async with semaphore:
+                return await get_keepa_client().query_product(asin)
+
+        raw = await asyncio.gather(*[_fetch(a) for a in asins], return_exceptions=True)
+        return [r for r in raw if isinstance(r, dict) and r]
 
     def calculate_volatility(
         self, current_price: float, last_price: Optional[float]
@@ -35,33 +39,37 @@ class PriceMonitorAgent:
         alerts = []
         processed = 0
         errors = 0
+        semaphore = asyncio.Semaphore(5)
 
-        for watch in watches:
-            try:
+        async def _check(watch: Dict[str, Any]):
+            async with semaphore:
                 asin = watch["asin"]
-                target_price = watch["target_price"]
-
                 result = await get_keepa_client().query_product(asin)
+                return asin, watch["target_price"], result
 
-                if result:
-                    current_price = result.get("current_price", 0)
+        raw = await asyncio.gather(
+            *[_check(w) for w in watches], return_exceptions=True
+        )
 
-                    if current_price <= target_price * 1.01:
-                        alerts.append(
-                            {
-                                "asin": asin,
-                                "current_price": current_price,
-                                "target_price": target_price,
-                                "alert_triggered": True,
-                            }
-                        )
-
-                    processed += 1
-                else:
-                    errors += 1
-            except Exception as e:
+        for item in raw:
+            if isinstance(item, Exception):
                 errors += 1
-                print(f"Error checking price for {watch.get('asin')}: {e}")
+                continue
+            asin, target_price, result = item
+            if result:
+                current_price = result.get("current_price", 0)
+                if current_price <= target_price * 1.01:
+                    alerts.append(
+                        {
+                            "asin": asin,
+                            "current_price": current_price,
+                            "target_price": target_price,
+                            "alert_triggered": True,
+                        }
+                    )
+                processed += 1
+            else:
+                errors += 1
 
         return {
             "processed": processed,

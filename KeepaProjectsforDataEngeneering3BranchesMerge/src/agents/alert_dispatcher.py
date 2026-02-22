@@ -1,6 +1,7 @@
 from src.services.notification import notification_service
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+import asyncio
 import re
 
 
@@ -133,8 +134,6 @@ class AlertDispatcherAgent:
                 }
             else:
                 for retry in range(self.MAX_RETRIES):
-                    import asyncio
-
                     await asyncio.sleep(self.RETRY_DELAYS[retry])
                     result = await self.send_alert(alert, channel)
                     if result.get("success"):

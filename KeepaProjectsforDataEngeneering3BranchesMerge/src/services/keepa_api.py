@@ -10,6 +10,12 @@ import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime
+
+try:
+    from src.utils.pipeline_logger import log_api_call, log_parser
+    _PIPELINE_LOG = True
+except ImportError:
+    _PIPELINE_LOG = False
 from concurrent.futures import ThreadPoolExecutor
 
 try:
@@ -282,9 +288,14 @@ class KeepaAPIClient:
                 self._api = None
                 self._is_initialized = False
 
-        # Initialize token bucket with default values
-        # Will be updated from actual API status
-        self._token_bucket = AsyncTokenBucket(tokens_per_minute=20, refill_interval=60)
+        # Initialize token bucket — sync with real Keepa token count if available
+        initial_tokens = 200  # safe default; Keepa plans typically have 100-5000/min
+        if self._api is not None:
+            real_tokens = self._get_tokens_left()
+            if real_tokens is not None and real_tokens > 0:
+                initial_tokens = real_tokens
+                logger.info(f"🔄 Token bucket initialized from Keepa API: {initial_tokens} tokens")
+        self._token_bucket = AsyncTokenBucket(tokens_per_minute=initial_tokens, refill_interval=60)
 
         # Thread pool for sync Keepa calls
         self._executor = ThreadPoolExecutor(max_workers=4)
@@ -408,9 +419,15 @@ class KeepaAPIClient:
 
         try:
             # Make API call
+            _t0 = time.time()
             products = await self._sync_call(
-                lambda: self._api.query(asin, domain=domain)
+                lambda: self._api.query(asin, domain=domain, stats=90, history=True, offers=20)
             )
+            _elapsed_ms = (time.time() - _t0) * 1000
+
+            # Pipeline logging: API call
+            if _PIPELINE_LOG:
+                log_api_call(asins=[asin], domain=domain, tokens_consumed=cost, response_time_ms=_elapsed_ms)
 
             # Sync token bucket with real Keepa API status
             await self.update_token_status()
@@ -420,49 +437,140 @@ class KeepaAPIClient:
 
             product = products[0]
 
-            # Extract prices (Keepa stores in cents)
-            current_price = 0
-            current_data = product.get("current")
-            if (
-                current_data
-                and isinstance(current_data, (list, tuple))
-                and len(current_data) >= 2
-            ):
-                current_price = current_data[1] / 100.0
-
-            list_price = 0
-            list_data = product.get("listPrice")
-            if (
-                list_data
-                and isinstance(list_data, (list, tuple))
-                and len(list_data) >= 2
-            ):
-                list_price = list_data[1] / 100.0
-
-            buy_box = 0
-            buybox_data = product.get("buyBoxPrice")
-            if (
-                buybox_data
-                and isinstance(buybox_data, (list, tuple))
-                and len(buybox_data) >= 2
-            ):
-                buy_box = buybox_data[1] / 100.0
-
-            rating = product.get("rating", 0) or 0
-            offers = product.get("offers", 0) or 0
-
-            # Count price history points
+            # Extract prices from keepa library csv arrays
+            # csv indices: 0=Amazon, 1=New, 2=Used, 3=Sales Rank, 4=List Price,
+            #   5=Collectible, 6=Refurbished, 7=New FBA, 8=Lightning Deals,
+            #   9=Warehouse Deals, 10=New FBM Shipping, 11=Buy Box,
+            #   12=Used Like New, 13=Used Very Good, 14=Used Good,
+            #   15=Used Acceptable, 16=Rating, 17=Review Count,
+            #   18=Buy Box Used, 19=Sales Rank Drops (30d)
+            # Each csv[i] is [keepa_time, value, keepa_time, value, ...] in cents
+            # Values: -1 = not available, -2 = no data
             csv_data = product.get("csv", [])
+
+            def _last_valid_price(arr):
+                """Get last valid price from a keepa csv array (cents -> EUR)."""
+                if arr is None or not hasattr(arr, '__len__') or len(arr) < 2:
+                    return 0
+                # Walk backwards through price values (odd indices)
+                for i in range(len(arr) - 1, 0, -2):
+                    val = arr[i]
+                    if isinstance(val, (int, float)) and val > 0:
+                        return val / 100.0
+                return 0
+
+            current_price = 0
+            list_price = 0
+            buy_box = 0
+
+            if csv_data and isinstance(csv_data, (list, tuple)):
+                # Priority: Amazon(0) > Buy Box(11) > New FBA(7) > New 3rd(1)
+                #           > Used Like New(12) > Buy Box Used(18) > Warehouse(9)
+                for idx in [0, 11, 7, 1, 12, 18, 9]:
+                    if len(csv_data) > idx and csv_data[idx] is not None:
+                        p = _last_valid_price(csv_data[idx])
+                        if p > 0:
+                            current_price = p
+                            break
+
+                # List price from index 4
+                if len(csv_data) > 4 and csv_data[4] is not None:
+                    list_price = _last_valid_price(csv_data[4])
+
+                # Buy box from index 11, fallback to Buy Box Used(18)
+                for bb_idx in [11, 18]:
+                    if len(csv_data) > bb_idx and csv_data[bb_idx] is not None:
+                        bb = _last_valid_price(csv_data[bb_idx])
+                        if bb > 0:
+                            buy_box = bb
+                            break
+
+            # Stats-fallback if csv parsing yielded 0 prices
+            stats_data = product.get("stats")
+            if stats_data and isinstance(stats_data, dict):
+                current_arr = stats_data.get("current", [])
+                if isinstance(current_arr, (list, tuple)):
+                    if current_price == 0:
+                        # Search ALL price indices in stats.current
+                        for idx in [0, 11, 7, 1, 12, 18, 9, 5, 6, 8, 13, 14, 15]:
+                            if len(current_arr) > idx and current_arr[idx] is not None:
+                                val = current_arr[idx]
+                                if isinstance(val, (int, float)) and val > 0:
+                                    current_price = val / 100.0
+                                    break
+
+                    if buy_box == 0:
+                        for idx in [11, 18]:
+                            if len(current_arr) > idx and current_arr[idx] is not None:
+                                val = current_arr[idx]
+                                if isinstance(val, (int, float)) and val > 0:
+                                    buy_box = val / 100.0
+                                    break
+
+                    if list_price == 0 and len(current_arr) > 4:
+                        val = current_arr[4]
+                        if isinstance(val, (int, float)) and val > 0:
+                            list_price = val / 100.0
+
+                # Named stat fields as additional fallback
+                if buy_box == 0:
+                    buy_box_stat = stats_data.get("buyBoxPrice")
+                    if isinstance(buy_box_stat, (int, float)) and buy_box_stat > 0:
+                        buy_box = buy_box_stat / 100.0
+                if list_price == 0:
+                    list_stat = stats_data.get("listPrice")
+                    if isinstance(list_stat, (int, float)) and list_stat > 0:
+                        list_price = list_stat / 100.0
+
+            # Offers-based fallback: extract price from offers array
+            if current_price == 0:
+                offers_data = product.get("offers")
+                if offers_data and isinstance(offers_data, list):
+                    for offer in offers_data:
+                        if not isinstance(offer, dict):
+                            continue
+                        offer_price = offer.get("offerCSV")
+                        if offer_price is not None:
+                            p = _last_valid_price(offer_price)
+                            if p > 0:
+                                current_price = p
+                                break
+
+            # If still no current_price, try buyBoxPrice from product root
+            if current_price == 0:
+                root_bb = product.get("buyBoxPrice")
+                if isinstance(root_bb, (int, float)) and root_bb > 0:
+                    current_price = root_bb / 100.0
+
+            # Rating: prefer product.rating, fallback to stats.current[16] / 10.0
+            rating = product.get("rating", 0) or 0
+            if isinstance(rating, (int, float)) and rating > 10:
+                rating = rating / 10.0
+            if (not rating or rating <= 0) and stats_data and isinstance(stats_data, dict):
+                current_arr = stats_data.get("current", [])
+                if isinstance(current_arr, (list, tuple)) and len(current_arr) > 16:
+                    r = current_arr[16]
+                    if isinstance(r, (int, float)) and r > 0:
+                        rating = r / 10.0
+
+            offers = product.get("offers", 0) or 0
+            if isinstance(offers, list):
+                offers = len(offers)
+
             history_count = (
                 len([c for c in csv_data if c is not None]) if csv_data else 0
             )
 
-            # Get category
             category = ""
             if product.get("categories") and product["categories"]:
                 category = str(product["categories"][-1])
 
-            return {
+            logger.info(
+                f"📊 {asin}: price={current_price}€, list={list_price}€, "
+                f"buybox={buy_box}€, rating={rating}"
+            )
+
+            result = {
                 "asin": asin,
                 "title": product.get("title", "Unknown"),
                 "current_price": current_price,
@@ -474,6 +582,13 @@ class KeepaAPIClient:
                 "price_history_count": history_count,
                 "timestamp": int(datetime.utcnow().timestamp()),
             }
+
+            # Pipeline logging: parser results
+            if _PIPELINE_LOG:
+                missing = [k for k, v in result.items() if k in ("current_price", "title", "rating") and not v]
+                log_parser(asin=asin, extracted_fields=result, missing_fields=missing)
+
+            return result
 
         except KeepaAPIError:
             raise

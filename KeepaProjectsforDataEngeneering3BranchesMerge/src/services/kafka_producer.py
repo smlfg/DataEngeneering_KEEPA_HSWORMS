@@ -8,6 +8,12 @@ from aiokafka.errors import KafkaError
 
 from src.config import get_settings
 
+try:
+    from src.utils.pipeline_logger import log_kafka_produce
+    _PIPELINE_LOG = True
+except ImportError:
+    _PIPELINE_LOG = False
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
@@ -65,7 +71,9 @@ class PriceUpdateProducer:
         }
 
         try:
-            await self.producer.send_and_wait(self.topic, key=asin, value=message)
+            result = await self.producer.send_and_wait(self.topic, key=asin, value=message)
+            if _PIPELINE_LOG:
+                log_kafka_produce(topic=self.topic, partition=result.partition, offset=result.offset)
             logger.debug(f"Sent price update for ASIN: {asin}")
             return True
         except KafkaError as e:
@@ -140,7 +148,9 @@ class DealUpdateProducer:
         }
 
         try:
-            await self.producer.send_and_wait(self.topic, key=asin, value=message)
+            result = await self.producer.send_and_wait(self.topic, key=asin, value=message)
+            if _PIPELINE_LOG:
+                log_kafka_produce(topic=self.topic, partition=result.partition, offset=result.offset)
             logger.debug(f"Sent deal update for ASIN: {asin}")
             return True
         except KafkaError as e:

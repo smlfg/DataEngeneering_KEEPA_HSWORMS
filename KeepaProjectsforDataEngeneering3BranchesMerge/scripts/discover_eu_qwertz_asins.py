@@ -40,6 +40,14 @@ MARKETS: Dict[str, Dict[str, Any]] = {
             "wireless tastatur",
             "qwertz tastatur",
             "deutsche tastatur",
+            "logitech tastatur",
+            "cherry tastatur",
+            "corsair tastatur",
+            "razer tastatur",
+            "keychron",
+            "ducky tastatur",
+            "steelseries tastatur",
+            "hyperx tastatur",
         ],
         "category_terms": [
             "tastatur",
@@ -166,16 +174,21 @@ def dedupe_preserve_order(values: Iterable[str]) -> List[str]:
 
 
 def http_get_json(url: str, timeout: int) -> Dict[str, Any]:
+    import gzip
+
     req = Request(
         url,
         headers={
             "User-Agent": "Mozilla/5.0",
             "Accept": "application/json",
+            "Accept-Encoding": "gzip",
         },
     )
     with urlopen(req, timeout=timeout) as resp:
-        raw = resp.read().decode("utf-8", errors="ignore")
-    return json.loads(raw)
+        raw = resp.read()
+    if raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    return json.loads(raw.decode("utf-8", errors="ignore"))
 
 
 def keepa_call(
@@ -425,7 +438,11 @@ def discover_from_bestsellers(
 def parse_current_price(current: Any) -> Optional[float]:
     if isinstance(current, list):
         for idx in (0, 7, 1):
-            if len(current) > idx and isinstance(current[idx], (int, float)) and current[idx] > 0:
+            if (
+                len(current) > idx
+                and isinstance(current[idx], (int, float))
+                and current[idx] > 0
+            ):
                 return round(float(current[idx]) / 100.0, 2)
     return None
 
@@ -509,7 +526,9 @@ def write_outputs(
         "records": [asdict(record) for record in selected_records],
     }
 
-    output_json.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    output_json.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     output_txt.write_text(",".join(selected_asins), encoding="utf-8")
 
 
@@ -553,7 +572,9 @@ def main() -> int:
         print("ERROR: Missing --api-key and KEEPA_API_KEY.", file=sys.stderr)
         return 2
 
-    selected_markets = [m.strip().upper() for m in str(args.markets).split(",") if m.strip()]
+    selected_markets = [
+        m.strip().upper() for m in str(args.markets).split(",") if m.strip()
+    ]
     invalid = [m for m in selected_markets if m not in MARKETS]
     if invalid:
         print(f"ERROR: Unsupported markets: {', '.join(invalid)}", file=sys.stderr)
@@ -642,7 +663,9 @@ def main() -> int:
                 asin for asin in ordered_asins if asin not in valid
             ]
             by_asin = {item.asin: item for item in ordered_candidates}
-            ordered_candidates = [by_asin[asin] for asin in ordered_asins if asin in by_asin]
+            ordered_candidates = [
+                by_asin[asin] for asin in ordered_asins if asin in by_asin
+            ]
 
     seed_limit = max(1, int(args.seed_limit))
     selected_asins = ordered_asins[:seed_limit]
@@ -675,12 +698,16 @@ def main() -> int:
 
     print(f"Unique discovered ASINs: {len(ordered_asins)}")
     print(f"Selected ASINs: {len(selected_asins)}")
-    print(f"Requests: {stats.requests_total}, errors: {stats.request_errors}, tokens: {stats.tokens_consumed_total}")
+    print(
+        f"Requests: {stats.requests_total}, errors: {stats.request_errors}, tokens: {stats.tokens_consumed_total}"
+    )
     print(f"Wrote JSON: {output_json}")
     print(f"Wrote TXT : {output_txt}")
 
     if not selected_asins:
-        print("WARNING: No ASINs discovered. Check API key, token status, and market filters.")
+        print(
+            "WARNING: No ASINs discovered. Check API key, token status, and market filters."
+        )
         return 1
 
     preview = ",".join(selected_asins[:20])

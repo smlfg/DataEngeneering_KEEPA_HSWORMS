@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -5,6 +6,12 @@ from typing import Any, Dict, List, Optional
 from elasticsearch import AsyncElasticsearch
 
 from src.config import get_settings
+
+try:
+    from src.utils.pipeline_logger import log_es_index
+    _PIPELINE_LOG = True
+except ImportError:
+    _PIPELINE_LOG = False
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -114,33 +121,34 @@ class ElasticsearchService:
             except Exception as e:
                 logger.error(f"Error creating index {index_name}: {e}")
 
+    async def _index_with_retry(self, index: str, document: Dict[str, Any], max_retries: int = 3) -> bool:
+        """Index a document with exponential backoff retry (1s, 2s, 4s)."""
+        for attempt in range(max_retries):
+            try:
+                await self.client.index(index=index, document=document)
+                if _PIPELINE_LOG:
+                    log_es_index(docs_indexed=1)
+                return True
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait = 2 ** attempt
+                    logger.warning(f"ES index retry {attempt + 1}/{max_retries} for {index}: {e} (waiting {wait}s)")
+                    await asyncio.sleep(wait)
+                else:
+                    if _PIPELINE_LOG:
+                        log_es_index(docs_indexed=0, errors=[str(e)])
+                    logger.error(f"ES index failed after {max_retries} retries for {index}: {e}")
+                    return False
+
     async def index_price_update(self, price_data: Dict[str, Any]) -> bool:
         if not self.client:
             return False
-
-        try:
-            await self.client.index(
-                index=self.prices_index,
-                document=price_data,
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Error indexing price update: {e}")
-            return False
+        return await self._index_with_retry(self.prices_index, price_data)
 
     async def index_deal_update(self, deal_data: Dict[str, Any]) -> bool:
         if not self.client:
             return False
-
-        try:
-            await self.client.index(
-                index=self.deals_index,
-                document=deal_data,
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Error indexing deal update: {e}")
-            return False
+        return await self._index_with_retry(self.deals_index, deal_data)
 
     async def search_prices(
         self,
@@ -255,6 +263,70 @@ class ElasticsearchService:
             return result.get("aggregations", {})
         except Exception as e:
             logger.error(f"Error getting deal aggregations: {e}")
+            return {}
+
+    async def get_deal_price_stats(self, asin: str) -> Dict[str, Any]:
+        """Get price statistics for an ASIN from deal snapshots in ES."""
+        if not self.client:
+            return {}
+
+        query = {"term": {"asin": asin}}
+
+        try:
+            result = await self.client.search(
+                index=self.deals_index,
+                query=query,
+                size=0,
+                aggs={
+                    "price_stats": {"stats": {"field": "current_price"}},
+                    "latest_price": {
+                        "top_hits": {
+                            "size": 1,
+                            "sort": [{"timestamp": "desc"}],
+                            "_source": ["current_price", "timestamp"],
+                        }
+                    },
+                    "price_over_time": {
+                        "date_histogram": {
+                            "field": "timestamp",
+                            "calendar_interval": "day",
+                        },
+                        "aggs": {
+                            "avg_price": {"avg": {"field": "current_price"}},
+                            "min_price": {"min": {"field": "current_price"}},
+                            "max_price": {"max": {"field": "current_price"}},
+                        },
+                    },
+                },
+            )
+
+            aggs = result.get("aggregations", {})
+            stats = aggs.get("price_stats", {})
+            latest_hits = aggs.get("latest_price", {}).get("hits", {}).get("hits", [])
+            current = (
+                latest_hits[0]["_source"]["current_price"] if latest_hits else None
+            )
+
+            return {
+                "min": stats.get("min"),
+                "max": stats.get("max"),
+                "avg": round(stats.get("avg", 0), 2) if stats.get("avg") else None,
+                "current": current,
+                "data_points": stats.get("count", 0),
+                "price_over_time": [
+                    {
+                        "date": bucket["key_as_string"],
+                        "avg_price": round(bucket["avg_price"]["value"], 2)
+                        if bucket["avg_price"]["value"]
+                        else None,
+                        "min_price": bucket["min_price"]["value"],
+                        "max_price": bucket["max_price"]["value"],
+                    }
+                    for bucket in aggs.get("price_over_time", {}).get("buckets", [])
+                ],
+            }
+        except Exception as e:
+            logger.error(f"Error getting deal price stats for {asin}: {e}")
             return {}
 
     async def delete_old_data(self, days: int = 90) -> int:

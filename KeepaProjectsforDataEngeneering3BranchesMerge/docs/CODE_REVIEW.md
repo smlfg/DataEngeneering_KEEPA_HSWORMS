@@ -92,29 +92,19 @@ src/
 
 ## 3. Bottlenecks & Performance
 
-### 3.1 Sequentielle API-Aufrufe (CRITICAL)
+> **Update 20.02.2026:** Mehrere der unten aufgeführten Issues wurden behoben.
 
-**scheduler.py:171-235:**
-```python
-for watch in watches:  # Sequential!
-    result = await self.check_single_price(watch)
-```
+### 3.1 Sequentielle API-Aufrufe
 
-**price_monitor.py:11-17:**
-```python
-async def fetch_prices(self, asins: List[str]) -> List[Dict[str, Any]]:
-    results = []
-    for asin in asins:  # Sequential - 50 separate API calls!
-        price_data = await keepa_client.query_product(asin)
-```
+**scheduler.py** — `run_price_check()` nutzt BEREITS `asyncio.gather()` mit `Semaphore(5)` (Zeile ~278-310). Dies wurde bei der ursprünglichen Review übersehen.
 
-**deal_finder.py:407-437:**
-```python
-for target in candidate_targets:  # Sequential!
-    product = await keepa_client.query_product(asin, domain_id=domain_id)
-```
+**price_monitor.py** — `fetch_prices()` und `check_prices()` waren sequentiell. **RESOLVED 20.02.2026:** Beide Methoden nutzen jetzt `asyncio.gather()` + `Semaphore(5)`.
 
-**Impact:** Bei 100 Watches = 100 × 15 Tokens = 1500 Tokens = 75 Minuten Wartezeit (bei 20/min). Mit Batch-Optimierung: 10 × 15 Tokens = 150 Tokens = 7.5 Minuten.
+**scheduler.py** — `_collect_seed_asin_deals()` war sequentiell. **RESOLVED 20.02.2026:** Parallelisiert mit `asyncio.gather()` + `Semaphore(5)`.
+
+**deal_finder.py:407-437** — `candidate_targets` Loop ist noch sequentiell, aber betrifft nur wenige Candidates pro Aufruf (typisch 1-3).
+
+**Verbleibender Optimierungspunkt:** Keepa erlaubt bis zu 10 ASINs pro Batch-Query. Das wird noch nicht genutzt — könnte Token-Kosten um ~90% reduzieren.
 
 ### 3.2 N+1 Query Problem
 
@@ -153,7 +143,7 @@ Dieselben Deals werden zu ES und Kafka gesendet in:
 2. `collect_deals_to_elasticsearch()` (scheduler.py:473-524)
 3. `deal_finder.run_daily_search()` (deal_finder.py:511-512)
 
-**Bewertung: 4/10** - Die sequentielle Verarbeitung ist der größte Performance-Killer.
+**Bewertung: 7/10** - Die Haupt-Loops nutzen jetzt `asyncio.gather()`. Verbleibender Punkt: Keepa Batch-Queries (10 ASINs/Call).
 
 ---
 
@@ -328,12 +318,12 @@ class PriceConstants:
 |-----------|-----------|
 | Keepa API Nutzung | 6/10 |
 | Architektur | 8/10 |
-| Performance | 4/10 |
+| Performance | 7/10 |
 | Effizienz | 6/10 |
 | Wartbarkeit | 7/10 |
-| **Gesamt** | **6.2/10** |
+| **Gesamt** | **6.8/10** |
 
-**Fazit:** Das System hat eine **solide Architektur** und ist gut strukturiert. Die größten Probleme sind **Performance-bezogen** (sequentielle API-Aufrufe) und **Infrastruktur-Verschwendung** (ungenutztes Redis). Mit den Top-5-Verbesserungen könnte das System 10x schneller werden.
+**Fazit:** Das System hat eine **solide Architektur** und ist gut strukturiert. Die sequentiellen API-Aufrufe in `price_monitor.py` und `scheduler.py` wurden parallelisiert (20.02.2026). Verbleibende Optimierung: Keepa Batch-Queries und Redis-Nutzung. Mit Batch-Queries könnte die Token-Effizienz nochmals um ~90% steigen.
 
 ---
 

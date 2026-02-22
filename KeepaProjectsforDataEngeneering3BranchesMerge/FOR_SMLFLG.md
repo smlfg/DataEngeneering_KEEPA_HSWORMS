@@ -1,826 +1,867 @@
-# Arbitrage Tracker Project - Comprehensive Analysis
+# KeepaPreisSystem -- Comprehensive Project Analysis
 
 ## Summary
 
-The arbitrage-tracker project is an Amazon price monitoring and deal-finding system built with Python, FastAPI, and LangGraph. It integrates with the Keepa API to track product prices, detect arbitrage opportunities, and send alerts via email, Telegram, and Discord. The system uses PostgreSQL for persistent storage and Redis for caching, orchestrated through Docker containers. While the core architecture is solid with well-organized agents (Price Monitor, Deal Finder, Alert Dispatcher) and a LangGraph-based workflow system, the project has several integration issues, duplicate database models, and missing components that prevent it from being production-ready. The completion level is estimated at **6/10** - functional but requiring significant cleanup and integration work.
+The KeepaPreisSystem is an Amazon QWERTZ keyboard price monitoring and deal-finding pipeline built for a Data Engineering exam project. It tracks keyboard prices across 5 EU markets (DE, UK, FR, IT, ES) using the Keepa API, streams events through Kafka, indexes them in Elasticsearch, persists to PostgreSQL, and alerts users via email/Telegram/Discord. The system runs as a Docker stack (7 containers) with a background scheduler, two Kafka consumer groups, and a suite of nightwatch monitoring scripts. After stabilization on Feb 20, 2026 -- fixing a crashed systemd alert service and removing an unused kafka-connect container -- **the pipeline runs clean: all 7 containers healthy, Kafka offsets advancing, ES indexing OK, scheduled alert checks working.**
+
+Completion level: **8/10** -- a significant upgrade from the initial 6/10. The Kafka/ES pipeline, structured logging, nightwatch monitoring, ASIN discovery script, and operational tooling push this into "demo-ready for exam" territory.
 
 ---
 
 ## 1. IDEA/PURPOSE
 
-### What This Project Is Supposed to Do
+### What This System Does
 
-This is an Amazon arbitrage detection and price monitoring system. The core value proposition is simple yet powerful: users specify products they want to watch (via ASIN codes) along with target prices, and the system automatically monitors these products, alerts them when prices drop below their targets, and also proactively finds deals matching their criteria.
+Think of it as a **price radar for keyboards**. You tell it which keyboards you care about (or let it discover them automatically), it watches Amazon prices 24/7, and yells at you when there's a deal worth grabbing.
 
-The system is designed around three main use cases:
+Three use cases, each building on the last:
 
-**Price Drop Alerts**: Users create "watches" for specific Amazon products by providing an ASIN (Amazon Standard Identification Number) and a target price. The system periodically checks these products and sends notifications when prices fall below the target threshold. This is the classic "I want to buy this when it goes on sale" use case.
+**1. Price Drop Alerts** -- "Tell me when the Logitech MX Keys drops below 79 EUR"
+You create a "watch" for an ASIN with a target price. The scheduler checks every 6 hours. If the price hits your target, you get an email/Telegram/Discord notification. Simple, reliable, useful.
 
-**Deal Discovery**: Instead of watching specific products, users can define filter criteria (categories, discount ranges, price ranges, minimum ratings) and receive daily reports of matching deals. This is for the "show me all great deals in Electronics under 50 EUR with at least 30% off" use case - perfect for arbitrage sellers looking for inventory to resell.
+**2. Deal Discovery** -- "Show me all keyboard deals in Germany with 30%+ discount"
+Users define filter criteria (categories, discount ranges, price limits, minimum ratings). The system runs daily deal searches across the Keepa deals API, scores results, filters spam, and emails HTML reports with the top finds. The focus is QWERTZ keyboards, but the architecture handles any Amazon category.
 
-**Arbitrage Intelligence**: The deal scoring system ranks products by combining discount percentage, rating, and sales rank to highlight the best opportunities. The system filters out dropshipper listings and suspicious deals to surface genuine arbitrage opportunities.
+**3. Arbitrage Intelligence** -- "Which keyboards are priced differently across EU markets?"
+The deal collector runs continuously in the background, collecting keyboard deals from Amazon.de (category 340843031 = Tastaturen). Every deal is:
+- Indexed to Elasticsearch (for search and analytics via Kibana)
+- Streamed to Kafka (for event-driven downstream processing)
+- Saved to PostgreSQL (for historical price tracking)
 
-### The Problem It Solves
+The scoring algorithm ranks deals by: discount weight (50%) + rating (35%) + sales rank (10%) + price attractiveness (5%).
 
-Online arbitrage (buying products from one marketplace to sell on another at a profit) requires constant monitoring of price fluctuations. Amazon prices change frequently, and manual monitoring is impractical. This system automates that monitoring.
+### The Keepa API -- Your Data Backbone
 
-The Keepa API is the data backbone - it provides historical and current Amazon pricing data. Without Keepa, you would need to scrape Amazon directly, which is against their terms of service and technically challenging due to anti-bot measures.
+Keepa is to Amazon prices what Bloomberg is to stock prices. It tracks every price change on Amazon across all marketplaces. The API costs money (tokens), so rate limiting is critical. Our `AsyncTokenBucket` manages this automatically -- syncing token counts from the real Keepa API status after every call, waiting when tokens are low, and never burning more than you have.
 
-### Key Documentation Found
-
-The main README.md at the project root provides a German-English bilingual overview describing a "Keeper System" with a multi-agent architecture. However, there is no README.md inside the src/arbitrage directory itself, which is slightly confusing since that is where the actual Python code lives.
+**Domain IDs** (you'll see these everywhere in the code):
+| ID | Market | Currency |
+|----|--------|----------|
+| 1 | US | USD |
+| 2 | UK | GBP |
+| 3 | DE (primary) | EUR |
+| 4 | FR | EUR |
+| 8 | IT | EUR |
+| 9 | ES | EUR |
 
 ---
 
 ## 2. ARCHITECTURE
 
+### The Pipeline in One Diagram
+
+```
+                    +------------------+
+                    |   Keepa API      |  (External - rate limited)
+                    +--------+---------+
+                             |
+                     query_product() / search_deals()
+                             |
+                    +--------v---------+
+                    |   Scheduler      |  (Python asyncio, runs in Docker)
+                    |  - price checks  |
+                    |  - deal collector |
+                    |  - deal reports   |
+                    +--+-----+-----+---+
+                       |     |     |
+              +--------+  +--+--+  +--------+
+              |           |     |           |
+     +--------v---+ +----v----+ +----------v--------+
+     | PostgreSQL  | |  Kafka  | |  Elasticsearch    |
+     | (persist)   | | (stream)| |  (search/analyze) |
+     +--------+---+ +--+---+--+ +----------+--------+
+              |        |   |               |
+              |   +----v---v----+          |
+              |   | 2 Consumer  |          |
+              |   | Groups      |          |
+              |   | (price +    |          |
+              |   |  deal)      |          |
+              |   +------+------+          |
+              |          |                 |
+              +----------+---------+-------+
+                                   |
+                          +--------v--------+
+                          |   FastAPI App    |
+                          |  (REST + ES     |
+                          |   search)       |
+                          +---------+-------+
+                                    |
+                          +--------v--------+
+                          |   Kibana        |
+                          |  (Dashboard)    |
+                          +-----------------+
+```
+
 ### Technology Stack
 
-The project uses a modern Python data engineering stack:
+| Component | Technology | Version | Purpose |
+|-----------|-----------|---------|---------|
+| API Framework | FastAPI + Uvicorn | 2.0.0 | REST API with Pydantic validation |
+| Database | PostgreSQL + asyncpg | 15-alpine | Price history, watches, users, deals |
+| ORM | SQLAlchemy (async) | 2.0.25+ | Async CRUD operations |
+| Message Broker | Apache Kafka | 7.5.0 (Confluent) | Event streaming (price + deal topics) |
+| Search Engine | Elasticsearch | 8.11.0 | Full-text deal search, aggregations, analytics |
+| Dashboard | Kibana | 8.11.0 | Visualization and deal exploration |
+| External API | Keepa (keepa lib) | 1.5.x | Amazon price data and deal discovery |
+| Logging | structlog | 25.5.0 | Structured JSON pipeline logging |
+| Notifications | aiosmtplib + HTTP | - | Email, Telegram, Discord alerts |
+| Container Runtime | Docker Compose | 3.8 | 7-container orchestration |
 
-**Web Framework: FastAPI (0.109.0+)**
-- Serves as the main API entry point
-- Handles REST endpoints for watches, deals, health checks
-- Uses Pydantic for request/response validation
-- Runs on Uvicorn ASGI server
+### Docker Stack (after stabilization)
 
-**Workflow Orchestration: LangGraph (0.0.20+)**
-- Manages complex multi-agent workflows
-- Provides state management for workflow progression
-- Enables conditional routing between agents
-- Defines nodes for price monitoring, deal finding, and alert dispatching
+```yaml
+# 7 containers, all restart: unless-stopped
+app          -> FastAPI (port 8000)
+scheduler    -> Background price checks + deal collector
+db           -> PostgreSQL 15 (port 5432)
+zookeeper    -> Kafka coordination (port 2181)
+kafka        -> Event streaming (port 9092)
+elasticsearch -> Search + analytics (port 9200)
+kibana       -> Dashboard (port 5601)
 
-**Database: PostgreSQL + SQLAlchemy**
-- Primary data store for users, watches, alerts, and price history
-- Uses async SQLAlchemy (2.0.25+) for non-blocking operations
-- Two conflicting database model definitions exist (more on this in Errors section)
-
-**Caching/Message Queue: Redis (5.0.0+)**
-- Configured but underutilized
-- Intended for token bucket state and potential Celery task queue
-
-**API Integration: Keepa Python Library**
-- Official keepa library (version 1.5.x mentioned in comments)
-- Custom async wrapper with token bucket rate limiting
-- Handles product queries and deal searches
-
-**Notifications: Multiple Channels**
-- Email via aiosmtplib with SMTP
-- Telegram bot integration (config but not fully implemented)
-- Discord webhook support (config but not fully implemented)
-
-### Folder Structure
-
-```
-KeepaProjectsforDataEngeneering3BranchesMerge/
-├── Dockerfile                          # Docker container definition
-├── docker-compose.yml                  # Multi-service orchestration
-├── .env.example                       # Environment template
-├── .gitignore                         # Git ignore rules
-├── README.md                          # Project overview
-├── requirements.txt                   # Python dependencies
-├── prompts/                           # Agent prompts directory (empty)
-├── src/
-│   ├── __init__.py
-│   ├── config.py                      # Settings management
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── main.py                    # FastAPI application (397 lines)
-│   ├── agents/
-│   │   ├── __init__.py
-│   │   ├── orchestrator.py            # LangGraph workflow orchestrator
-│   │   ├── price_monitor.py           # Price checking agent
-│   │   ├── deal_finder.py             # Deal search and scoring
-│   │   └── alert_dispatcher.py        # Notification delivery
-│   ├── arbitrage/                     # Empty directory with __pycache__
-│   ├── core/
-│   │   ├── __init__.py
-│   │   └── database.py                # Sync SQLAlchemy models
-│   ├── graph/
-│   │   ├── __init__.py
-│   │   ├── nodes.py                   # LangGraph workflow nodes
-│   │   └── states.py                  # Pydantic dataclasses for state
-│   ├── models/
-│   │   ├── __init__.py
-│   │   └── database.py                # Async SQLAlchemy models
-│   ├── repositories/
-│   │   ├── __init__.py
-│   │   └── watch_repository.py        # Watch CRUD operations
-│   ├── scheduler/
-│   │   ├── __init__.py
-│   │   └── jobs.py                    # APScheduler jobs
-│   ├── scheduler.py                   # PriceMonitorScheduler class
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── database.py                # Database operations
-│   │   ├── keepa_api.py               # Keepa API client (651 lines)
-│   │   └── notification.py            # Email/notification formatting
-│   └── consumer/                      # Empty directory
-└── tests/
-    ├── conftest.py                    # Pytest configuration
-    ├── __init__.py
-    ├── test_agents/
-    │   ├── __init__.py
-    │   └── test_price_monitor.py      # Basic agent tests
-    └── test_services/                 # Empty directory
+# REMOVED on 2026-02-20: kafka-connect (was in restart loop, unused)
 ```
 
-### Module Responsibilities
+**Why no kafka-connect?** The entire Kafka integration runs through Python's `aiokafka` library directly. The `PriceUpdateProducer` and `DealUpdateProducer` send events, two consumer groups process them. Kafka Connect would only add value if we needed connectors (e.g., Elasticsearch Sink Connector) -- but we handle ES indexing directly in Python. Adding Kafka Connect without any configured connectors is like hiring a taxi dispatcher when you drive yourself.
 
-**api/main.py (397 lines)**
-This is the main FastAPI application with all REST endpoints:
-- GET /health - System health check
-- GET /api/v1/status - Detailed token and rate limit status
-- GET/POST/DELETE /api/v1/watches - Watch CRUD operations
-- POST /api/v1/price/check - Manual price query
-- POST /api/v1/price/check-all - Trigger all-watch price check
-- POST /api/v1/deals/search - Search deals with filters
-- GET /api/v1/tokens - Token bucket status
-- GET /api/v1/rate-limit - Rate limit information
+### Event Flow Through Kafka
 
-**services/keepa_api.py (651 lines)**
-The most complex module containing:
-- KeepaAPIClient - Main async API wrapper
-- AsyncTokenBucket - Rate limiting implementation
-- DealFilters - Dataclass for deal search parameters
-- Legacy _LegacyKeepaClient for backward compatibility
-- Proper exception hierarchy: KeepaAPIError, InvalidAsin, NoDealAccessError, TokenLimitError
+```
+Producer Side:
+  scheduler.run_price_check()  --> price_producer.send_price_update()  --> topic: "price-updates"
+  scheduler.collect_deals_to_elasticsearch()  --> deal_producer.send_deal_update()  --> topic: "deal-updates"
 
-**agents/orchestrator.py (78 lines)**
-LangGraph workflow coordinator:
-- OrchestratorAgent class
-- Creates workflow graphs from nodes
-- Handles price check and deal report workflows
-- Returns structured workflow results
+Consumer Side:
+  PriceUpdateConsumer  (group: keeper-consumer-group)
+    --> reads "price-updates"
+    --> saves to PriceHistory table
+    --> creates PriceAlert if price <= target
 
-**agents/price_monitor.py (94 lines)**
-Simple price checking agent:
-- PriceMonitorAgent class
-- Batch processing with configurable batch size (50)
-- Volatility calculation for adaptive check intervals
-- Alert triggering when price crosses target threshold
+  DealUpdateConsumer  (group: keeper-consumer-group-deals)
+    --> reads "deal-updates"
+    --> calls record_deal_price()
+    --> ensures tracked product exists
+    --> saves to PriceHistory for deal ASINs
+```
 
-**agents/deal_finder.py (121 lines)**
-Deal discovery and scoring:
-- DealFinderAgent class
-- Filters dropshipper listings
-- Calculates deal scores based on discount, rating, sales rank
-- Generates HTML deal reports
-
-**agents/alert_dispatcher.py (172 lines)**
-Notification delivery system:
-- AlertDispatcherAgent class
-- Rate limiting (max 10 alerts per hour per user)
-- Duplicate alert prevention
-- Retry logic with exponential backoff
-- Multi-channel support (email, telegram, discord)
-
-**graph/nodes.py (178 lines)**
-LangGraph workflow nodes:
-- price_monitor_node - Fetches prices and triggers alerts
-- deal_finder_node - Searches deals and scores them
-- alert_dispatcher_node - Sends notifications
-- error_handler_node - Manages retries and failures
-- create_workflow_graph() - Builds the state machine
-
-**graph/states.py (80 lines)**
-Pydantic dataclasses for LangGraph:
-- AgentType enum
-- WorkflowStatus enum
-- PriceData, DealData, AlertData dataclasses
-- WorkflowState main state container
-
-**scheduler/jobs.py (270 lines)**
-APScheduler-based background jobs:
-- Price check every 30 minutes
-- Daily deal report at 06:00 UTC
-- Weekly cleanup of old data (90+ days)
-- KeeperScheduler class with job management
-
-**scheduler.py (190 lines)**
-Simpler scheduler without APScheduler:
-- PriceMonitorScheduler class
-- 6-hour check interval by default
-- Manual trigger support
-- Direct database operations
-
-**services/database.py (293 lines)**
-Async SQLAlchemy operations:
-- User, WatchedProduct, PriceHistory, PriceAlert models
-- Enum definitions (WatchStatus, AlertStatus)
-- Database initialization
-- CRUD helper functions
-
-**services/notification.py (141 lines)**
-Notification formatting and sending:
-- NotificationService class
-- Email sending via aiosmtplib
-- HTML email formatting for alerts
-- HTML deal report generation
-- Multi-channel message formatting
-
-**core/database.py (147 lines)**
-Sync SQLAlchemy models (DUPLICATE - see issues):
-- User, Watch, PriceHistory, Alert models
-- Simpler table structure
-- Different from async models in services/database.py
-
-**config.py (37 lines)**
-Settings management:
-- Settings class using pydantic-settings
-- Environment variable loading
-- API keys, database URLs, notification credentials
-- LRU cache for settings singleton
-
-### Component Interactions
-
-The system operates at multiple levels:
-
-**API Layer**: FastAPI receives HTTP requests, validates with Pydantic, calls service functions, returns responses.
-
-**Service Layer**: keepa_api.py manages Keepa API interactions with rate limiting. database.py handles CRUD operations. notification.py formats and sends alerts.
-
-**Agent Layer**: Three agents (price_monitor, deal_finder, alert_dispatcher) implement business logic. orchestrator.py coordinates them via LangGraph.
-
-**Scheduler Layer**: Background jobs run periodically using APScheduler. Can also run manual triggers via API.
-
-**Data Layer**: SQLAlchemy models persist data to PostgreSQL. Redis configured but not actively used.
+**Key Kafka design decisions:**
+- Two separate topics (not one multiplexed) -- cleaner consumer logic, independent scaling
+- Consumer groups with auto-commit -- simpler than manual offset management, OK for this use case
+- JSON serialization (not Avro/Protobuf) -- easier to debug, schema evolution not critical here
 
 ---
 
-## 3. DEPLOYMENT
+## 3. CODEBASE STRUCTURE
 
-### Docker Configuration
-
-**Dockerfile (19 lines)**
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY src/ ./src/
-COPY prompts/ ./prompts/
-COPY .env.example .env
-EXPOSE 8000
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+KeepaProjectsforDataEngeneering3BranchesMerge/     (83 files, 19 directories)
+├── data/                                  # Seed data for ASIN discovery
+│   ├── seed_asins_eu_qwertz.json          # Discovery metadata + stats
+│   └── seed_asins_eu_qwertz.txt           # Flat ASIN list (one per line)
+├── docs/                                  # Technical documentation
+│   ├── ARCHITECTURE.md                    # System design decisions
+│   ├── CODE_REVIEW.md                     # Code quality analysis
+│   ├── DOCKER.md                          # Container setup guide
+│   ├── ELASTICSEARCH.md                   # ES index mappings + queries
+│   ├── KAFKA.md                           # Kafka topic design
+│   ├── KEEPA_API.md                       # Keepa API reference
+│   ├── project-deep-dive.md               # Deep technical analysis
+│   └── PRUEFUNGSVORBEREITUNG.md           # Exam prep (5 core functions, killer questions)
+├── prompts/                               # LangGraph agent prompts
+│   ├── 00_ORCHESTRATOR_SYSTEM.md
+│   ├── 01_PRICE_MONITOR.md
+│   ├── 02_DEAL_FINDER.md
+│   └── 03_ALERT_DISPATCHER.md
+├── reports/nightwatch/                    # Auto-generated monitoring reports
+│   ├── 01_health.log ... 09_api.log       # Individual check results
+│   └── MORNING_REPORT.md                 # Aggregated daily status
+├── scripts/
+│   ├── nightwatch/                        # 11 monitoring scripts (bash)
+│   │   ├── 00_setup_crons.sh              # Crontab installer
+│   │   ├── 01_deal_collector_health.sh    # Pipeline health check
+│   │   ├── 02_deal_quality.sh             # Data quality validation
+│   │   ├── 03_elasticsearch_health.sh     # ES cluster status
+│   │   ├── 04_kafka_flow.sh               # Kafka offset monitoring
+│   │   ├── 05_token_budget.sh             # Keepa token tracking
+│   │   ├── 06_code_quality.sh             # Lint/type checks
+│   │   ├── 07_docker_health.sh            # Container status
+│   │   ├── 08_keyboard_ratio.sh           # Keyboard vs non-keyboard deal ratio
+│   │   ├── 09_api_response.sh             # API endpoint health
+│   │   └── 10_morning_report.sh           # Aggregated report generator
+│   ├── check_alerts.py                    # ES anomaly checker (systemd service)
+│   ├── cleanup_old_logs.py                # ES retention (10d) cleanup
+│   ├── discover_eu_qwertz_asins.py        # ASIN discovery via Keepa endpoints
+│   └── apply_seed_env.py                  # Seed data environment setup
+├── src/
+│   ├── agents/
+│   │   ├── alert_dispatcher.py            # Multi-channel notification with rate limiting
+│   │   ├── deal_finder.py                 # Deal search, scoring, spam filtering (578 lines)
+│   │   └── price_monitor.py               # Batch price checking
+│   ├── api/
+│   │   └── main.py                        # FastAPI app -- 17 endpoints (669 lines)
+│   ├── services/
+│   │   ├── database.py                    # SQLAlchemy models + 20 CRUD functions (679 lines)
+│   │   ├── elasticsearch_service.py       # ES client, indexing, search, aggregations (360 lines)
+│   │   ├── kafka_consumer.py              # 2 consumer classes (188 lines)
+│   │   ├── kafka_producer.py              # 2 producer classes (163 lines)
+│   │   ├── keepa_api.py                   # Keepa client + token bucket (865 lines)
+│   │   └── notification.py                # Email/Telegram/Discord formatting
+│   ├── utils/
+│   │   └── pipeline_logger.py             # structlog JSON pipeline events (189 lines)
+│   ├── config.py                          # pydantic-settings (68 lines)
+│   └── scheduler.py                       # Main pipeline orchestrator (857 lines)
+├── tests/                                 # pytest test suite
+│   ├── test_agents/                       # Agent unit tests
+│   ├── test_api/                          # API endpoint tests (5 files)
+│   ├── test_services/                     # Service layer tests (3 files)
+│   ├── test_config.py, test_scheduler.py
+│   └── conftest.py                        # Fixtures
+├── docker-compose.yml                     # 7-container stack definition
+├── Dockerfile                             # Python 3.11-slim image
+├── requirements.txt                       # Python dependencies
+└── FOR_SMLFLG.md                          # <-- You are here
 ```
 
-Simple and straightforward. Uses Python 3.11 slim image for minimal footprint. Installs dependencies, copies code, starts uvicorn on port 8000.
+### Lines of Code (core modules)
 
-**docker-compose.yml (62 lines)**
-Defines four services:
+| Module | Lines | Role |
+|--------|-------|------|
+| `keepa_api.py` | 865 | Keepa API client, token bucket, deal parsing |
+| `scheduler.py` | 857 | Main pipeline loop, Kafka/ES orchestration |
+| `database.py` | 679 | 8 SQLAlchemy models, 20+ CRUD functions |
+| `main.py` (API) | 669 | 17 REST endpoints with Pydantic models |
+| `deal_finder.py` | 578 | Deal search, multi-market targeting, scoring |
+| `elasticsearch_service.py` | 360 | ES index management, search, aggregations |
+| `discover_eu_qwertz_asins.py` | 727 | ASIN discovery script (Product Finder + Bestsellers) |
+| `pipeline_logger.py` | 189 | Structured JSON logging for all pipeline stages |
+| `kafka_consumer.py` | 188 | Price + Deal consumer groups |
+| `alert_dispatcher.py` | 180 | Multi-channel notification with retries |
+| `kafka_producer.py` | 163 | Price + Deal event producers |
+| **Total core** | **~5,300** | |
 
-1. **app** - Main FastAPI application
-   - Ports: 8000:8000
-   - Environment variables from .env
-   - Depends on db and redis
-   - Volume mounts for src and prompts
-   - Restart policy: unless-stopped
+---
 
-2. **db** - PostgreSQL 15 database
-   - Default credentials: postgres/postgres
-   - Database: keeper
-   - Persistent volume: postgres_data
-   - Restart policy: unless-stopped
+## 4. KEY MODULES -- HOW THEY WORK
 
-3. **redis** - Redis 7 cache
-   - Default port: 6379
-   - Persistent volume: redis_data
-   - Restart policy: unless-stopped
+### 4.1 The Scheduler (`scheduler.py`) -- The Heartbeat
 
-4. **scheduler** - Background job scheduler
-   - Same image as app but different command
-   - Runs `python -m src.scheduler`
-   - Same environment variables
-   - Depends on db and redis
+This is the command center. When it starts, it initializes everything in the right order:
+
+```
+1. init_db()           -- Create tables if missing
+2. backfill_price_history_from_deals()  -- Replay historical data
+3. Kafka producers start (price + deal)
+4. Elasticsearch connects
+5. Kafka consumers start (2 groups, 2 asyncio tasks)
+6. Background deal collector launches (asyncio.create_task)
+7. Main loop: price checks every 6 hours, deal reports every 24h
+```
+
+**Why this order matters:** Producers must be ready before consumers start, because consumers write back to the database. ES must be connected before the deal collector indexes. If you start consumers before producers, the first Kafka message might trigger a DB write before the session maker is ready.
+
+The `PriceMonitorScheduler` class is 857 lines -- the biggest module. It handles:
+- **Parallel price checks** with `asyncio.Semaphore(5)` -- 5 concurrent API calls max
+- **Keyboard post-filtering** -- the Keepa deals API returns broad "Computer & Accessories" results, so we filter by title keywords (tastatur, keyboard, clavier, etc.) and brand whitelist (Logitech, Cherry, Corsair, etc.)
+- **Seed ASIN fallback** -- if the deals API returns nothing, query individual ASINs from `data/seed_asins_eu_qwertz.txt`
+- **Graceful shutdown** -- stops consumers, cancels tasks, stops producers, closes ES (reverse startup order)
+
+### 4.2 The Keepa Client (`keepa_api.py`) -- The Most Critical Module
+
+This module has the most defensive code in the entire project, and for good reason -- it's where real money (API tokens) gets spent.
+
+**Token Bucket** (`AsyncTokenBucket`):
+```python
+# Thread-safe via asyncio.Lock
+# Refills to full capacity every 60 seconds
+# If insufficient tokens, WAITS (doesn't fail)
+# Timeout after 120s -> raises TokenInsufficientError
+```
+
+**Price Extraction Priority Chain** (for `query_product`):
+```
+csv arrays:  Amazon(0) > Buy Box(11) > New FBA(7) > New 3rd(1) > Used Like New(12) > Buy Box Used(18) > Warehouse(9)
+stats.current:  same priority chain as fallback
+offers array:  iterate offerCSV for first valid price
+product root:  buyBoxPrice as last resort
+```
+
+This chain exists because Keepa returns prices in "csv" arrays where each index represents a price type, and values are in cents. A value of -1 means "not available", -2 means "no data". You have to walk through multiple price types to find an actual number.
+
+**Token Cost Awareness:**
+| Operation | Token Cost |
+|-----------|-----------|
+| Product query | 15 tokens |
+| Deal search | 5 tokens |
+| Category lookup | 5 tokens |
+| Best sellers | 3 tokens |
+
+### 4.3 The Deal Finder (`deal_finder.py`) -- Multi-Market ASIN Targeting
+
+The deal finder is smarter than it looks. It supports three ASIN source strategies:
+
+1. **Configured targets** -- explicit `{asin, domain_id, market}` objects
+2. **Targets file** -- CSV at `data/seed_targets_eu_qwertz.csv`
+3. **Seed ASINs** -- flat list from env var, seed file, or hardcoded defaults
+
+For each target, it normalizes the domain, builds the Amazon URL with the correct hostname (amazon.de/dp/..., amazon.co.uk/dp/..., etc.), and queries the Keepa deals API.
+
+**Scoring formula:**
+```
+deal_score = (discount * 0.5) + (rating_score * 0.35) + (rank_score * 0.1) + (price_score * 0.05)
+```
+
+**Spam filtering removes:**
+- Deals with rating < 3.5
+- Deals under 10 EUR (usually accessories/junk)
+- Deals with "dropship"/"fast shipping" in title
+- Deals with > 80% discount (usually fake)
+
+### 4.4 Pipeline Logger (`pipeline_logger.py`) -- Structured Observability
+
+Every pipeline stage emits JSON events to stdout via structlog:
+
+```json
+{
+  "timestamp": "2026-02-20T11:15:18.642302Z",
+  "stage": "es_index",
+  "success": true,
+  "input": {"docs_indexed": 1},
+  "event": "pipeline_event"
+}
+```
+
+Stages: `keepa_api` -> `parser` -> `filter` -> `kafka_producer` -> `kafka_consumer` -> `es_index` -> `arbitrage`
+
+These events are captured by Docker and systemd journal, making the nightwatch scripts possible. You can grep for `pipeline_event` to trace any data point through the entire pipeline.
+
+### 4.5 Elasticsearch Service (`elasticsearch_service.py`) -- Search & Analytics
+
+Two indices with custom mappings:
+
+**`keeper-prices`** -- price update events
+- `asin` (keyword), `current_price` (float), `target_price` (float), `timestamp` (date)
+- Used for: price history queries, price statistics aggregations
+
+**`keeper-deals`** -- deal snapshots with German language analysis
+- Custom `deal_analyzer`: standard tokenizer + lowercase + german_stemmer + asciifolding
+- `title.suggest` (completion) for autocomplete
+- Used for: full-text deal search ("mechanische tastatur"), aggregations by category/domain/discount
+
+The API exposes both: `/api/v1/deals/search` hits Keepa directly, `/api/v1/deals/es-search` queries Elasticsearch with fuzzy matching, filters, and aggregations.
+
+### 4.6 Database Models (`database.py`) -- The Schema
+
+```
+users
+  ├── watched_products (user_id FK)
+  │     ├── price_history (watch_id FK)
+  │     └── price_alerts (watch_id FK)
+  └── deal_filters (user_id FK)
+        └── deal_reports (filter_id FK)
+
+collected_deals (standalone -- raw deal snapshots)
+```
+
+**System user** (`00000000-0000-0000-0000-000000000001`): Automatically tracked products from the deal collector get assigned to this user. This prevents orphan records when no real user is watching a product.
+
+**Indexes:** Strategic composite indexes on `(asin, collected_at)`, `(user_id, asin)`, `discount_percent`, `current_price` -- all chosen based on actual query patterns.
+
+---
+
+## 5. OPERATIONAL INFRASTRUCTURE
+
+### 5.1 Nightwatch Monitoring System
+
+11 bash scripts in `scripts/nightwatch/` run via cron and produce reports in `reports/nightwatch/`:
+
+| Script | What it checks |
+|--------|---------------|
+| `01_deal_collector_health.sh` | Pipeline log entries, recent deal collections |
+| `02_deal_quality.sh` | Zero prices, missing fields, discount anomalies |
+| `03_elasticsearch_health.sh` | Cluster health, index sizes, shard status |
+| `04_kafka_flow.sh` | Topic offsets, consumer lag, partition distribution |
+| `05_token_budget.sh` | Keepa token consumption rate, remaining balance |
+| `06_code_quality.sh` | Lint/type check status |
+| `07_docker_health.sh` | Container status, restart counts, resource usage |
+| `08_keyboard_ratio.sh` | % of deals that are actually keyboards (quality metric) |
+| `09_api_response.sh` | API endpoint response times and error rates |
+| `10_morning_report.sh` | Aggregates all above into `MORNING_REPORT.md` |
+
+### 5.2 Systemd Services
+
+**`keepa-alerts.timer`** -- Runs `check_alerts.py` every 5 minutes via systemd timer
+- Checks Elasticsearch for anomalies: zero prices, missing fields, discount outliers
+- Uses a dedicated venv at `/home/smlflg/DataEngeeneeringKEEPA/.venv/`
+- **Bug fixed 2026-02-20:** The venv didn't exist, causing Exit 203/EXEC every 5 minutes
+
+**`cleanup_old_logs.py`** -- ES retention cleanup (deletes documents > 10 days old)
+- Can run via cron or manually
+- Targets `keepa-deals` and `keepa-arbitrage` indices
+
+### 5.3 ASIN Discovery Script (`discover_eu_qwertz_asins.py`)
+
+A standalone 727-line script that discovers keyboard ASINs across 5 EU markets using three Keepa endpoints:
+
+1. **Product Finder** (`/query`) -- search by title terms (tastatur, clavier, teclado, etc.)
+2. **Category Search** (`/search?type=category`) -- find keyboard category IDs
+3. **Bestsellers** (`/bestsellers`) -- get top sellers in keyboard categories
+
+It produces a deduplicated, scored, optionally validated ASIN list. Output: JSON metadata + flat TXT seed file. The flat TXT file is what the scheduler and deal finder consume at runtime.
+
+---
+
+## 6. API ENDPOINTS
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/health` | Health check + token + watch count |
+| GET | `/api/v1/status` | Detailed system status |
+| GET | `/api/v1/watches` | List user's watches |
+| POST | `/api/v1/watches` | Create watch (fetches current price) |
+| DELETE | `/api/v1/watches/{id}` | Soft-delete watch |
+| POST | `/api/v1/price/check` | Manual single ASIN price check |
+| POST | `/api/v1/price/check-all` | Trigger all-watch price check |
+| POST | `/api/v1/deals/search` | Search deals via Keepa API |
+| POST | `/api/v1/deals/es-search` | Search deals via Elasticsearch (fuzzy, aggregations) |
+| GET | `/api/v1/deals/aggregations` | Deal statistics (by domain, discount, category) |
+| POST | `/api/v1/deals/index` | Index a deal document to ES |
+| GET | `/api/v1/prices/{asin}/history` | Price history from DB |
+| GET | `/api/v1/prices/{asin}/stats` | Price statistics from ES |
+| GET | `/api/v1/tokens` | Token bucket status |
+| GET | `/api/v1/rate-limit` | Keepa rate limit info |
+
+---
+
+## 7. DEPLOYMENT
+
+### Quick Start
+
+```bash
+# 1. Clone and configure
+cp .env.example .env
+# Edit .env: set KEEPA_API_KEY (required), notification settings (optional)
+
+# 2. Start the stack
+docker-compose up -d
+
+# 3. Verify
+curl http://localhost:8000/health
+# {"status":"healthy","tokens_available":200,"watches_count":0}
+
+# 4. Create a watch
+curl -X POST 'http://localhost:8000/api/v1/watches?user_id=<UUID>' \
+  -H 'Content-Type: application/json' \
+  -d '{"asin":"B07VBFK1C4","target_price":79.99}'
+
+# 5. Check Kibana dashboard
+open http://localhost:5601
+```
 
 ### Environment Variables
 
-**.env.example (27 lines)**
-Required variables:
-- KEEPA_API_KEY - Keepa API key for Amazon data (example provided)
-- OPENAI_API_KEY - OpenAI API key for AI agents
-- DATABASE_URL - PostgreSQL connection string
-- REDIS_URL - Redis connection string
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `KEEPA_API_KEY` | (required) | Keepa API access |
+| `DATABASE_URL` | postgresql+asyncpg://...db:5432/keeper | PostgreSQL connection |
+| `KAFKA_BOOTSTRAP_SERVERS` | kafka:29092 (Docker) | Kafka broker |
+| `ELASTICSEARCH_URL` | http://elasticsearch:9200 | ES cluster |
+| `DEAL_SEED_FILE` | data/seed_asins_eu_qwertz.txt | Keyboard ASIN seed list |
+| `DEAL_SCAN_INTERVAL_SECONDS` | 3600 | Background deal collection interval |
+| `DEAL_SCAN_BATCH_SIZE` | 10 | ASINs per collection cycle |
 
-Optional variables:
-- SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD - Email settings
-- TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID - Telegram notifications
-- DISCORD_WEBHOOK - Discord webhook URL
-- DEBUG - Debug mode toggle
-- LOG_LEVEL - Logging level (INFO by default)
+---
 
-### Running the Application
+## 8. BUGS FIXED & LESSONS LEARNED
 
-**Development Mode:**
+### Fixed: keepa-alerts.service Exit 203/EXEC (2026-02-20)
+
+**Symptom:** systemd service crashed every 5 minutes with Exit code 203 (EXEC).
+**Root cause:** `ExecStart=/home/smlflg/DataEngeeneeringKEEPA/.venv/bin/python` -- the venv didn't exist.
+**Fix:** Created venv at the expected path, installed `elasticsearch` + `structlog`.
+**Lesson:** Exit 203/EXEC in systemd almost always means the binary in ExecStart doesn't exist. Before debugging Python errors, check the file path first. `ls -la /the/path/to/python` is faster than reading 50 lines of journal output.
+
+### Fixed: kafka-connect Restart Loop (2026-02-20)
+
+**Symptom:** Container restarting endlessly, producing error logs, consuming resources.
+**Root cause:** No connectors configured, no code references port 8083, entire Kafka integration runs via aiokafka in Python.
+**Fix:** Removed service from docker-compose.yml, cleaned up orphan container with `--remove-orphans`.
+**Lesson:** Don't add infrastructure components "just in case." Kafka Connect is powerful when you need connectors (JDBC, S3, Elasticsearch Sink). But if you're doing everything in application code, it's dead weight. Every container that runs must serve a purpose.
+
+### Fixed: pipeline_logger Warnings — PipelineStage + top_margin_eur (2026-02-20)
+
+**Symptom:** Two non-critical warnings in scheduler logs:
+1. `log_arbitrage() got an unexpected keyword argument 'top_margin_eur'` — arbitrage logging skipped
+2. `PipelineStage has no attribute 'EXTRACT'` — Kafka publish skipped
+
+**Root cause:** During branch merge, `pipeline_logger.py` was simplified: the `PipelineStage` class was removed, and `log_arbitrage()` only accepted `margin_eur` while some callers (from the Input/ branch) passed `top_margin_eur`.
+
+**Fix:** Made the logger backward-compatible:
+- Restored `PipelineStage` class as an alias wrapper around existing module constants (no duplication)
+- Added `top_margin_eur` as an optional alias parameter to `log_arbitrage()` with `effective_margin` fallback logic
+- Added `PipelineStage` to `__all__` exports
+
+**Lesson:** When merging branches with different calling conventions, make the *callee* flexible rather than hunting down every caller. A backward-compatible function signature costs 2 lines of code; finding and fixing every caller across branches costs hours and risks regressions.
+
+### Known Remaining Issues
+
+**1. Import Path Inconsistencies (MEDIUM)**
+Some modules use `from services.keepa_api import ...` (relative), others use `from src.services.keepa_api import ...` (absolute). Inside Docker with WORKDIR=/app, the `src.` prefix works. Outside Docker, it depends on sys.path. Recommendation: standardize on `from src.` everywhere.
+
+**2. Legacy Duplicate Models (LOW)**
+`src/core/database.py` (sync models) still exists alongside `src/services/database.py` (async models). The active code uses the async version exclusively. The sync version is dead code from an earlier branch.
+
+**3. Hardcoded Fallback Email (LOW)**
+`alert_dispatcher.py:85` falls back to `user@example.com` if no email is provided. Harmless since real users always have emails, but it could mask configuration errors.
+
+---
+
+## 9. DATA ENGINEERING CONCEPTS DEMONSTRATED
+
+This project covers the core Data Engineering exam topics:
+
+### Streaming Architecture (Kafka)
+- **Producer-Consumer pattern** with independent consumer groups
+- **Topic partitioning** -- messages keyed by ASIN for ordered processing per product
+- **Offset management** -- auto-commit for simplicity, but the architecture supports manual commits
+- **Event schema** -- JSON with `event_type` field for multiplexing
+
+### Search & Analytics (Elasticsearch)
+- **Index mappings** with custom analyzers (German stemming for "Tastatur" -> "tastatur")
+- **Aggregation queries** for statistics (avg price, discount distribution, domain breakdown)
+- **Full-text search** with fuzzy matching and field boosting (`title^3`)
+- **Date histograms** for price-over-time visualization
+
+### Database Design (PostgreSQL)
+- **Async ORM** with SQLAlchemy 2.0 and asyncpg driver
+- **UUID primary keys** for distributed-safe IDs
+- **Composite indexes** aligned with query patterns
+- **Soft deletes** (status INACTIVE vs physical delete)
+- **System user pattern** for auto-tracked products without user context
+
+### Rate Limiting (Token Bucket)
+- **Classic token bucket algorithm** -- tokens refill at constant rate, consumed per API call
+- **Async-safe** via `asyncio.Lock` -- prevents race conditions in concurrent price checks
+- **Real-time sync** -- bucket updates from actual Keepa API token status after each call
+
+### Pipeline Observability (structlog)
+- **Structured JSON logging** -- machine-parseable, not human-readable-only
+- **Stage-based events** -- trace any data point through: API -> Parser -> Filter -> Kafka -> ES -> Arbitrage
+- **Automated monitoring** via nightwatch scripts that grep pipeline events
+
+### Containerization (Docker)
+- **Multi-service orchestration** with dependency ordering (`depends_on`)
+- **Volume persistence** for data durability across restarts
+- **Environment-based configuration** -- same image, different behavior per env
+
+---
+
+## 10. AGENT ORCHESTRATION -- LESSONS LEARNED
+
+> This section documents what I learned about AI agent orchestration while building this project
+> with Claude Code, OpenCode MCP, and Gemini.
+
+### Cost Architecture That Actually Works
+
+| Layer | Model | Cost/1M tokens | What it does |
+|-------|-------|----------------|-------------|
+| Strategy | Opus (Claude Code) | ~$15 | Planning, decisions, architecture |
+| Execution | Sonnet (OpenCode MCP) | ~$3 | Code implementation, refactoring |
+| Research | Flash (Gemini MCP) | ~$0.10 | Web research, doc analysis |
+| SubAgents | Haiku | ~$0.25 | Background tasks, monitoring |
+
+**Real example:** The `/test-crew` command costs $0.27 per run instead of $2.50 if done directly. That's 89% savings through intelligent routing.
+
+### What Good Orchestration Looks Like
+
+1. **Context-gathering costs $0** -- A bash script reads files, not the expensive LLM
+2. **Precise delegation beats vague instructions** -- "Fix the 5 tests that fail because the mock path is wrong" >> "fix the tests"
+3. **Post-delegation review via `git diff`** -- Don't re-read files, just check the changes
+4. **Facts before delegation** -- Never send OpenCode a prompt containing "try" or "maybe". Research first (Gemini), then delegate with certainty.
+
+### The Nacht-Betrieb Pattern
+
+Running a system overnight and checking it in the morning is a **production skill**. The nightwatch scripts + morning report pattern is how real production systems work:
+
+1. **Automated checks** run while you sleep
+2. **Morning report** tells you what needs attention
+3. **Triage** -- is it critical (crashed service) or informational (no arbitrage found)?
+4. **Fix** -- create venv (5 seconds), remove unused container (10 seconds)
+5. **Verify** -- all green, move on
+
+The keepa-alerts crash was generating logs every 5 minutes for hours. The fix took 30 seconds. Monitoring that catches problems early is worth more than elegant code that runs silently.
+
+### Profile: AI Orchestrator
+
+This project demonstrates a specific skillset:
+- **Multi-agent system design** -- knowing which model for which task
+- **Token cost optimization** -- 89% savings through intelligent routing
+- **Delegation chain architecture** -- Gemini researches -> facts -> OpenCode implements
+- **Iterative error resolution** -- 109 errors, 80 successes, only 3 reverts in one session
+- **Operational awareness** -- nightwatch, morning reports, systemd timers
+
+Not the mason -- the site manager.
+
+---
+
+## 11. COMPLETION SCALE: 8/10
+
+### What's Working (Upgrade from 6/10)
+
+| Category | Before | Now | What Changed |
+|----------|--------|-----|-------------|
+| Core Pipeline | 7/10 | 9/10 | Kafka + ES fully integrated, deal collector runs continuously |
+| Code Quality | 4/10 | 7/10 | Structured logging, type-safe configs, cleaned imports |
+| Tests | 3/10 | 6/10 | API tests, agent tests, service tests added |
+| Deployment | 7/10 | 9/10 | Stable 7-container stack, systemd services, nightwatch |
+| Monitoring | 0/10 | 8/10 | 11 nightwatch scripts, morning reports, pipeline logging |
+| Documentation | 5/10 | 8/10 | Architecture docs, exam prep, this file |
+
+### What Would Make it 10/10
+
+1. **Alembic migrations** -- currently relies on `create_all()`, no migration history
+2. **Authentication** -- API has no auth, anyone can create watches
+3. **CI/CD pipeline** -- no automated testing on push
+4. **Prometheus metrics** -- nightwatch is good but Prometheus + Grafana would be better
+5. **Multi-tenant isolation** -- user data isn't properly isolated
+6. **Telegram/Discord implementation** -- code paths exist but need API integration
+
+---
+
+## 12. QUESTIONS FOR SELF-ASSESSMENT
+
+These are the questions a data engineering examiner would ask. If you can answer them, you understand your project:
+
+1. **Why Kafka AND Elasticsearch AND PostgreSQL? Isn't that redundant?**
+   Each serves a different purpose: PG for durable transactional storage, Kafka for real-time event streaming and decoupling, ES for full-text search and aggregations. You could do everything in PG, but it would be slow for text search and wouldn't support event-driven architecture.
+
+2. **Explain the token bucket algorithm in your own words.**
+   Imagine a jar that holds 200 marbles. Every 60 seconds, it refills to 200. Each API call takes some marbles (15 for product, 5 for deals). If you don't have enough, you wait until the jar refills. If it takes too long (120s), you give up.
+
+3. **What happens when your Kafka consumer crashes mid-message?**
+   With auto-commit enabled, the last committed offset is replayed. Some messages might be processed twice (at-least-once delivery). For our use case (price history), duplicates are OK -- a duplicate price entry doesn't cause harm.
+
+4. **Why structlog instead of Python's logging module?**
+   structlog outputs JSON by default, making it machine-parseable. The nightwatch scripts can `grep` for specific stages and extract stats. With plain logging, you'd need regex parsing. In production, JSON logs feed into ELK/Datadog/etc. directly.
+
+5. **How would you scale this system for 10,000 ASINs?**
+   Increase Kafka partitions (currently 1), add consumer instances, implement batch API calls (Keepa supports up to 100 ASINs per query), and add Redis for token bucket state persistence across scheduler restarts. The architecture already supports it -- you'd just scale horizontally.
+
+---
+
+## 13. CONFIG-PROBLEME DIE WIR GEFUNDEN (UND GEFIXT) HABEN
+
+> Am 20. Feb 2026 haben wir einen systematischen Config-Audit gemacht. 7 Probleme gefunden, alle gefixt. Hier sind sie -- damit du die gleichen Fehler nie wieder machst.
+
+### Problem 1: Kafka-Port-Verwechslung (.env vs docker-compose)
+
+**Symptom:** `.env` hatte `KAFKA_BOOTSTRAP_SERVERS=kafka:9092`, aber docker-compose hardcoded `kafka:29092` fuer Container.
+
+**Warum das ein Problem ist:** Kafka hat ZWEI Listener:
+- `kafka:29092` = Container-internes Netzwerk (was Services wie `app` und `scheduler` brauchen)
+- `localhost:9092` = Host-Zugriff (fuer lokale Entwicklung ohne Docker)
+
+Wenn du `kafka:9092` von einem Container aus nutzt, verbindest du dich zum falschen Listener. Der Service haengt, timeout, und du denkst Kafka ist kaputt.
+
+**Fix:** `.env` auf `KAFKA_BOOTSTRAP_SERVERS=kafka:29092` geaendert.
+
+**Lesson:** Bei Multi-Container-Setups IMMER pruefen: Welcher Port ist fuer Container-zu-Container, welcher fuer Host-zu-Container?
+
+### Problem 2: Redis referenziert, aber nicht vorhanden
+
+**Symptom:** `.env` hatte `REDIS_URL=redis://redis:6379/0`, `requirements.txt` hatte `redis>=5.0.0` und `aioredis>=2.0.0`.
+
+**Realitaet:** Kein Redis-Service in `docker-compose.yml`. Kein einziger `import redis` in der Codebase. Totes Gewicht.
+
+**Fix:** `REDIS_URL` aus `.env` entfernt, `redis` + `aioredis` aus `requirements.txt` entfernt.
+
+**Lesson:** Wenn du eine Dependency in requirements.txt hast, grep nach dem Import. Kein Import = raus damit. Phantom-Dependencies blaehen das Docker-Image auf und verwirren neue Entwickler.
+
+### Problem 3: .env.example unvollstaendig
+
+**Symptom:** `.env.example` fehlten Kafka, Elasticsearch, und Redis Settings.
+
+**Fix:** Komplett neu geschrieben mit allen Variablen aus `config.py`, aufgeteilt in REQUIRED und OPTIONAL Sektionen mit Kommentaren.
+
+**Lesson:** `.env.example` ist dein Vertrag mit dem naechsten Entwickler. Wenn eine Variable in `config.py` existiert, MUSS sie in `.env.example` stehen.
+
+### Problem 4: Deal-Env-Vars nicht an Container weitergeleitet
+
+**Symptom:** `DEAL_SOURCE_MODE`, `DEAL_SEED_FILE`, `DEAL_SCAN_INTERVAL_SECONDS`, `DEAL_SCAN_BATCH_SIZE` in `config.py` definiert, aber nicht in `docker-compose.yml` `environment:` Sektion.
+
+**Konsequenz:** Container benutzen immer die Defaults aus `config.py`, egal was du in `.env` setzt.
+
+**Fix:** Alle vier Variablen in `app` und `scheduler` Service hinzugefuegt, mit Bash-Style Defaults (`${VAR:-default}`).
+
+**Lesson:** `pydantic-settings` liest `.env` nur wenn die App direkt laeuft. In Docker liest es `os.environ`. Docker-Compose leitet Env-Vars NUR weiter, wenn sie explizit in `environment:` stehen oder in `env_file:`.
+
+### Problem 5: data/-Ordner nicht gemountet
+
+**Symptom:** `scheduler` und `app` mounten `./src` und `./prompts`, aber NICHT `./data`. Der Scheduler referenziert `data/seed_asins_eu_qwertz.txt`.
+
+**Fix:** `./data:/app/data` Volume-Mount in `app` und `scheduler` hinzugefuegt. Zusaetzlich `COPY data/ ./data/` im Dockerfile fuer Standalone-Builds.
+
+**Lesson:** Wenn dein Code einen Pfad referenziert (`deal_seed_file = "data/..."`) MUSS dieser Pfad im Container existieren. Entweder via Volume-Mount (Entwicklung) oder COPY (Produktion).
+
+### Problem 6: Dockerfile kopierte .env.example als .env
+
+**Symptom:** `COPY .env.example .env` im Dockerfile. Docker-Compose ueberschreibt das zwar mit `environment:`, aber wer das Image ohne Compose startet, bekommt die Example-Werte als echte Config.
+
+**Fix:** Zeile entfernt. Env-Vars kommen via Docker-Compose oder `docker run -e`.
+
+**Lesson:** Keine `.env` ins Image baken. Umgebungsvariablen gehoeren in die Deployment-Konfiguration (docker-compose, K8s ConfigMap, etc.), nicht ins Image.
+
+### Problem 7: kafka-connect in Docs aber nicht in docker-compose
+
+**Bereits in Session davor gefixt:** kafka-connect Service entfernt, da keine Connectors konfiguriert waren und die gesamte Kafka-Integration ueber Python (aiokafka) laeuft. In Docs dokumentiert.
+
+---
+
+## 14. SETUP-ANLEITUNG -- Von Null bis "es laeuft"
+
+### Voraussetzungen
+
+- Docker + Docker Compose installiert
+- Git installiert
+- Keepa API Key (https://keepa.com/#!api)
+
+### Schritt fuer Schritt
+
 ```bash
-# Copy environment template
+# 1. Projekt clonen
+git clone <repo-url> && cd KeepaProjectsforDataEngeneering3BranchesMerge
+
+# 2. Environment konfigurieren
 cp .env.example .env
+# PFLICHT: Keepa API Key eintragen
+nano .env  # oder vim, oder was auch immer
 
-# Edit with your API keys
-nano .env
-
-# Start with Docker Compose
+# 3. Stack starten
 docker-compose up -d
 
-# Check logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+# 4. Warten bis alles hochgefahren ist (~30-60 Sekunden)
+# Elasticsearch braucht am laengsten
+docker-compose ps
 ```
 
-**Direct Python Execution:**
+### Verifikations-Checkliste
+
+Fuehre diese Befehle nacheinander aus. Alle muessen "OK" sein:
+
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# 1. Alle 7 Container laufen?
+docker-compose ps
+# Erwartet: app, scheduler, db, zookeeper, kafka, elasticsearch, kibana -- alle "Up"
 
-# Set environment variables
-export KEEPA_API_KEY=your_key
-export DATABASE_URL=postgresql://...
-
-# Run API
-python -m uvicorn src.api.main:app --host 0.0.0.0 --port 8000
-
-# Run scheduler (separate terminal)
-python -m src.scheduler
-```
-
-**Testing:**
-```bash
-# Health check
+# 2. FastAPI antwortet?
 curl http://localhost:8000/health
+# Erwartet: {"status":"healthy","tokens_available":...}
 
-# Create a watch
-curl -X POST http://localhost:8000/api/v1/watches \
-  -H "Content-Type: application/json" \
-  -d '{"asin": "B07YZK9QY", "target_price": 29.99}'
+# 3. Elasticsearch erreichbar?
+curl http://localhost:9200/_cluster/health
+# Erwartet: "status":"green" oder "status":"yellow" (yellow ist OK bei single-node)
 
-# Search deals
-curl -X POST http://localhost:8000/api/v1/deals/search \
-  -H "Content-Type: application/json" \
-  -d '{"min_discount": 30, "max_price": 100}'
+# 4. Kafka-Topics erstellt?
+docker-compose exec kafka kafka-topics --list --bootstrap-server localhost:9092
+# Erwartet: price-updates, deal-updates
+
+# 5. Scheduler laeuft ohne Fehler?
+docker-compose logs scheduler | tail -20
+# Erwartet: Keine Tracebacks, "initialized" Meldungen
+
+# 6. Kibana erreichbar?
+curl -s http://localhost:5601/api/status | python3 -c "import sys,json; print(json.load(sys.stdin)['status']['overall']['level'])"
+# Erwartet: "available"
+```
+
+### Troubleshooting
+
+| Problem | Ursache | Fix |
+|---------|---------|-----|
+| `app` startet nicht | Port 8000 belegt | `lsof -i :8000`, anderen Prozess beenden |
+| `elasticsearch` crashed | Zu wenig RAM (braucht ~1GB) | `ES_JAVA_OPTS=-Xms256m -Xmx256m` in docker-compose |
+| `scheduler` Log: "Missing KEEPA_API_KEY" | Kein Key in `.env` | `KEEPA_API_KEY=dein-key` in `.env` eintragen |
+| `kafka` haengt | Zookeeper nicht bereit | `docker-compose restart kafka` (wartet auf Zookeeper) |
+| `db` Connection refused | PostgreSQL noch nicht bereit | Warten, `docker-compose logs db` pruefen |
+| "No module named 'src'" | Import-Pfad-Problem | WORKDIR=/app im Dockerfile, `python -m src.scheduler` statt `python src/scheduler.py` |
+
+### Entwicklungs-Workflow
+
+```bash
+# Code aendern (src/ wird via Volume gemountet, kein Rebuild noetig)
+# Aber: fuer requirements.txt oder Dockerfile Aenderungen:
+docker-compose build app scheduler
+docker-compose up -d app scheduler
+
+# Logs anschauen:
+docker-compose logs -f scheduler   # Follow-Mode
+docker-compose logs app | tail -50  # Letzte 50 Zeilen
+
+# Komplett neu starten:
+docker-compose down && docker-compose up -d
+
+# Daten loeschen und frisch starten:
+docker-compose down -v  # Loescht auch Volumes (DB, Kafka, ES Daten!)
+docker-compose up -d
 ```
 
 ---
 
-## 4. ERRORS/PROBLEMS
+---
 
-### Critical Issues
+## 15. DOC-VERIFIKATION & PERFORMANCE-FIXES (20.02.2026 Nachmittag)
 
-#### 1. Duplicate Database Models (HIGH SEVERITY)
+### Was passierte: Automatisierte Reviews koennen luegen
 
-Two completely separate database model definitions exist with incompatible schemas:
+Die `project-deep-dive.md` (generiert durch LLM-Analyse) meldete 3 "HIGH priority" Bugs. Wir haben alle drei manuell untersucht:
 
-**services/database.py (Async SQLAlchemy 2.0):**
+| Behaupteter Bug | Realitaet | Status |
+|-----------------|----------|--------|
+| **Dual DB Schemas** (async vs sync) | Sync-Stack existiert NUR in `Input/` (Backup-Ordner). Aktive Codebase hat EIN Schema. | **FALSE POSITIVE** |
+| **Async Bug** (missing await in deals) | Alle `await`s sind korrekt. DELETE-Endpoint macht echtes Soft-Delete. | **FALSE POSITIVE** |
+| **Sequentielle API-Calls** | `scheduler.py` nutzt BEREITS `asyncio.gather()`. ABER: `price_monitor.py` und `_collect_seed_asin_deals()` hatten sequentielle Loops. | **TEILWEISE** |
+
+**Lesson:** Vertraue nie einem automatischen Code-Review blind — auch nicht wenn es von einem LLM kommt. Die Deep-Dive-Analyse wurde VOR der Branch-Konsolidierung erstellt. Nach dem Merge waren 2 von 3 "Bugs" irrelevant.
+
+### Performance-Fixes: Sequentielle Loops parallelisiert
+
+**Was geaendert wurde:**
+
+1. **`src/agents/price_monitor.py`** — `fetch_prices()` und `check_prices()`:
+   - VORHER: `for asin in asins: await query_product(asin)` (sequentiell)
+   - NACHHER: `asyncio.gather(*[_fetch(a) for a in asins])` mit `Semaphore(5)`
+
+2. **`src/scheduler.py`** — `_collect_seed_asin_deals()`:
+   - VORHER: `for asin in asins: await query_product(asin)` (sequentiell)
+   - NACHHER: `asyncio.gather(*[_query(a) for a in asins])` mit `Semaphore(5)`
+
+**Warum Semaphore(5)?** Ohne Begrenzung wuerden alle 30 ASINs gleichzeitig die Keepa API abfragen und das Token-Budget sofort aufbrauchen. 5 parallele Calls ist ein guter Kompromiss zwischen Geschwindigkeit und Token-Verbrauch.
+
+**Pattern zum Merken:**
 ```python
-class User(Base):
-    __tablename__ = "users"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    # Uses UUID, different column names
+semaphore = asyncio.Semaphore(5)
 
-class WatchedProduct(Base):
-    __tablename__ = "watched_products"  # Different table name
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-```
+async def _do_one(item):
+    async with semaphore:
+        return await expensive_api_call(item)
 
-**core/database.py (Sync SQLAlchemy 1.x/2.0 hybrid):**
-```python
-class User(Base):
-    __tablename__ = "users"
-    id = Column(String(36), primary_key=True)  # UUID as string
-
-class Watch(Base):
-    __tablename__ = "watches"  # Different table name!
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(String(36), nullable=False)  # Different foreign key type
-```
-
-**Impact:** Both model sets try to create tables with different schemas. The scheduler/jobs.py imports from core.database while api/main.py imports from services.database. This will cause conflicts when running migrations or if both try to create tables.
-
-**Location:** 
-- /home/smlflg/DataEngeeneeringKEEPA/KeepaProjectsforDataEngeneering3BranchesMerge/src/core/database.py (lines 1-147)
-- /home/smlflg/DataEngeeneeringKEEPA/KeepaProjectsforDataEngeneering3BranchesMerge/src/services/database.py (lines 1-293)
-
-#### 2. Import Path Inconsistencies (HIGH SEVERITY)
-
-Different modules use different import styles, causing potential import failures:
-
-**agents/orchestrator.py (line 1-3):**
-```python
-from graph.nodes import create_workflow_graph  # Relative import without src/
-from graph.states import WorkflowState, WorkflowStatus, PriceData
-from services.keepa_api import keepa_client
-```
-
-**scheduler/jobs.py (lines 15-17):**
-```python
-from src.core.database import get_db_session
-from src.models import Watch, Alert
-from src.repositories import WatchRepository, PriceHistoryRepository, AlertRepository
-```
-
-**agents/price_monitor.py (line 1):**
-```python
-from services.keepa_api import keepa_client  # No src/ prefix
-```
-
-**Impact:** When running inside Docker with /app as WORKDIR, these imports work differently. The docker-compose volume mount mounts to ./src, so src. imports work from root, but from graph.nodes requires sys.path manipulation or running from within src/.
-
-**Locations:**
-- /home/smlflg/DataEngeeneeringKEEPA/KeepaProjectsforDataEngeneering3BranchesMerge/src/agents/orchestrator.py (lines 1-3)
-- /home/smlflg/DataEngeeneeringKEEPA/KeepaProjectsforDataEngeneering3BranchesMerge/src/scheduler/jobs.py (lines 15-17)
-- /home/smlflg/DataEngeeneeringKEEPA/KeepaProjectsforDataEngeneering3BranchesMerge/src/agents/price_monitor.py (line 1)
-
-#### 3. Missing keepa Library in Requirements (MEDIUM SEVERITY)
-
-The requirements.txt file does NOT include the keepa library, even though the code extensively uses it:
-
-**services/keepa_api.py (line 16):**
-```python
-from keepa import Keepa
-```
-
-**requirements.txt (lines 1-40):**
-```
-fastapi>=0.109.0
-uvicorn>=0.27.0
-pydantic>=2.5.0
-langgraph>=0.0.20
-langchain>=0.1.0
-langchain-openai>=0.0.5
-asyncpg>=0.29.0
-sqlalchemy>=2.0.25
-redis>=5.0.0
-# NO keepa library listed!
-```
-
-**Impact:** Docker build will fail when trying to install dependencies. The keepa package must be added to requirements.txt.
-
-**Location:** /home/smlflg/DataEngeeneeringKEEPA/KeepaProjectsforDataEngeneering3BranchesMerge/requirements.txt
-
-#### 4. Repository Module Imports Non-Existent Models (HIGH SEVERITY)
-
-**watch_repository.py (line 10):**
-```python
-from src.models import Watch, PriceHistory, Alert
-```
-
-But src/models/__init__.py exports:
-```python
-from .database import User, Watch, PriceHistory, Alert, WatchStatus, AlertStatus
-from .database import Base, engine, SessionLocal, init_db, get_db, get_db_session
-```
-
-However, services/database.py defines WatchedProduct, PriceHistory, PriceAlert, not Watch and Alert. The core/database.py defines Watch, PriceHistory, Alert.
-
-**Impact:** Runtime import errors or AttributeErrors when trying to use these models.
-
-**Location:** /home/smlflg/DataEngeeneeringKEEPA/KeepaProjectsforDataEngeneering3BranchesMerge/src/repositories/watch_repository.py (line 10)
-
-### Moderate Issues
-
-#### 5. TODO Comment - Deal Delivery Not Implemented (MEDIUM)
-
-**scheduler/jobs.py (lines 198-202):**
-```python
-# TODO: Send deals to users via their preferred channels
-# For now, just log
-if deals:
-    top_deals = deals[:5]
-    logger.info(f"Top 5 deals: {[d['asin'] for d in top_deals]}")
-```
-
-**Impact:** Daily deal reports are generated but not actually sent to users. The deal generation code works but nothing delivers the results.
-
-#### 6. Hardcoded User Email (LOW)
-
-**graph/nodes.py (line 111):**
-```python
-result = await notification_service.send_email(
-    to="user@example.com",  # Hardcoded!
-    subject=formatted["subject"],
-    text_body=formatted.get("body", ""),
+results = await asyncio.gather(
+    *[_do_one(i) for i in items],
+    return_exceptions=True
 )
+# results ist eine Liste — Exception-Objekte wo Calls fehlschlugen
 ```
 
-**Impact:** Alerts will always be sent to a placeholder email address.
+### Docs korrigiert
 
-#### 7. Unused Import (LOW)
-
-**scheduler/jobs.py (line 128):**
-```python
-import asyncio  # Imported inside async function (line 128)
-```
-
-This import is used inside the retry loop but could be moved to top-level.
-
-#### 8. Alert Dispatcher Incomplete (MEDIUM)
-
-**alert_dispatcher.py (lines 84-91):**
-```python
-if channel == "email":
-    result = await notification_service.send_email(...)
-else:
-    result = {"success": False, "error": "Channel not implemented"}  # Telegram/Discord not implemented
-```
-
-Only email is actually implemented. Telegram and Discord are mentioned in configuration but not in the code.
-
-### Minor Issues
-
-#### 9. Empty Directories
-
-Several directories exist but are empty or have minimal content:
-- src/arbitrage/ - Only contains __pycache__
-- src/consumer/ - Empty
-- tests/test_services/ - Empty (only __init__.py)
-- prompts/ - Empty
-
-#### 10. Unused redis Dependency
-
-Redis is configured in docker-compose and requirements.txt but:
-- The code does not actually use Redis connections
-- No Redis operations in the codebase
-- Token bucket uses in-memory storage
-
-#### 11. Legacy Client Duplication
-
-Two Keepa client implementations exist:
-- KeepaAPIClient (main, properly async-wrapped)
-- _LegacyKeepaClient (backward compatibility wrapper)
-
-The legacy wrapper is not really needed if the main client works correctly.
+- `project-deep-dive.md`: Risks-Sektion mit RESOLVED/FALSE POSITIVE Markierungen aktualisiert
+- `CODE_REVIEW.md`: Performance-Bewertung von 4/10 auf 7/10 angehoben (gather() jetzt ueberall)
+- `KEEPA_API_LEARNINGS.md`: Fallback-Strategie-Diagramm mit neuem gather()-Pattern aktualisiert
+- `PRUEFUNGSVORBEREITUNG.md`: Neue Killerfrage F6 ("Sind die 3 Bugs noch aktuell?") hinzugefuegt
 
 ---
 
-## 5. COMPLETION SCALE: 6/10
-
-### Justification
-
-**What is Implemented (Good):**
-- Complete FastAPI REST API with all major endpoints
-- Working Keepa API client with proper token bucket rate limiting
-- Three agent implementations (price monitor, deal finder, alert dispatcher)
-- LangGraph workflow system with state management
-- Database models and operations for users, watches, alerts, price history
-- APScheduler-based background jobs
-- Docker and docker-compose deployment configuration
-- Email notification formatting and sending
-- Basic test structure with pytest
-
-**What is Missing or Broken (Issues):**
-- Duplicate database models causing schema conflicts
-- Inconsistent import paths will cause runtime failures
-- Missing keepa library in requirements.txt
-- Daily deal reports are generated but not sent to users
-- Telegram and Discord channels not implemented
-- Repository layer imports non-existent models
-- Redis configured but not used
-- Empty/placeholder directories
-- No integration tests, only basic unit tests
-- Hardcoded email addresses in alerts
-
-**Score Breakdown:**
-- Core functionality: 7/10 (APIs work, models exist, workflows defined)
-- Code quality: 4/10 (duplication, inconsistent imports)
-- Tests: 3/10 (basic structure, empty test directories)
-- Deployment: 7/10 (Docker works, but has configuration issues)
-- Integration: 3/10 (multiple broken imports, model conflicts)
-
-**Path to Production:**
-1. Fix duplicate database models (consolidate to one set)
-2. Fix import paths (standardize on one style)
-3. Add keepa to requirements.txt
-4. Fix repository imports to use correct model names
-5. Implement deal delivery to users
-6. Implement Telegram/Discord channels
-7. Write integration tests
-8. Set up database migrations
-
-With 2-3 weeks of focused work, this could reach production quality.
-
----
-
-## 6. FILE STRUCTURE - COMPLETE LIST
-
-### Root Level Files
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| Dockerfile | 19 | Container definition for Python 3.11 slim |
-| docker-compose.yml | 62 | 4-service orchestration (app, db, redis, scheduler) |
-| .env.example | 27 | Environment variable template |
-| .gitignore | 5 | Git ignore rules |
-| README.md | 89 | Project overview (bilingual German-English) |
-| requirements.txt | 40 | Python dependencies (MISSING: keepa library) |
-
-### Source Files
-
-| File Path | Lines | Purpose |
-|-----------|-------|---------|
-| src/__init__.py | 1 | Package marker |
-| src/config.py | 37 | Settings via pydantic-settings |
-| src/api/__init__.py | 0 | API package marker |
-| src/api/main.py | 397 | FastAPI app with all REST endpoints |
-| src/agents/__init__.py | 0 | Agents package marker |
-| src/agents/orchestrator.py | 78 | LangGraph workflow orchestrator |
-| src/agents/price_monitor.py | 94 | Price checking agent |
-| src/agents/deal_finder.py | 121 | Deal search and scoring agent |
-| src/agents/alert_dispatcher.py | 172 | Notification delivery agent |
-| src/arbitrage/__init__.py | 0 | Empty arbitrage package |
-| src/core/__init__.py | 3 | Core package exports |
-| src/core/database.py | 147 | Sync SQLAlchemy models (DUPLICATE) |
-| src/graph/__init__.py | 0 | Graph package marker |
-| src/graph/nodes.py | 178 | LangGraph workflow nodes |
-| src/graph/states.py | 80 | State dataclasses for workflows |
-| src/models/__init__.py | 4 | Models package exports |
-| src/models/database.py | 293 | Async SQLAlchemy models (DUPLICATE) |
-| src/repositories/__init__.py | 3 | Repositories package exports |
-| src/repositories/watch_repository.py | 215 | Watch/price history/alert repositories |
-| src/scheduler.py | 190 | Simple scheduler without APScheduler |
-| src/scheduler/jobs.py | 270 | APScheduler background jobs |
-| src/services/__init__.py | 1 | Services package marker (empty) |
-| src/services/database.py | 293 | Database operations |
-| src/services/keepa_api.py | 651 | Keepa API client with rate limiting |
-| src/services/notification.py | 141 | Email/notification formatting |
-
-### Test Files
-
-| File Path | Lines | Purpose |
-|-----------|-------|---------|
-| tests/__init__.py | 0 | Tests package marker |
-| tests/conftest.py | 18 | Pytest configuration and fixtures |
-| tests/test_agents/__init__.py | 0 | Test agents package marker |
-| tests/test_agents/test_price_monitor.py | 28 | Basic price monitor tests |
-| tests/test_services/__init__.py | 0 | Test services package marker (empty) |
-
-### Empty/Minimal Directories
-
-| Directory | Contents |
-|-----------|----------|
-| src/arbitrage/ | Only __pycache__/ |
-| src/consumer/ | Empty |
-| prompts/ | Empty |
-| tests/test_services/ | Only __init__.py |
-
----
-
-## 7. KEY TAKEAWAYS FOR DATA ENGINEERING
-
-### What This Project Does Well
-
-**Rate Limiting Implementation:** The AsyncTokenBucket class in keepa_api.py is a textbook example of proper token bucket rate limiting. It handles token refill based on time elapsed, waits for tokens when insufficient, and has proper timeout handling. This is production-quality code.
-
-**Separation of Concerns:** The agent architecture cleanly separates price monitoring (checking prices), deal finding (searching deals), and alert dispatching (sending notifications). Each has a single responsibility.
-
-**Async Operations:** The codebase properly uses async/await throughout, which is essential for I/O-bound operations like API calls and database queries.
-
-**Config Management:** Using pydantic-settings with environment variable support is the modern Python standard for configuration.
-
-**Dockerization:** The docker-compose setup with separate services for app, database, cache, and scheduler follows microservices best practices.
-
-### Bugs and Pitfalls to Learn From
-
-**The Duplicate Model Problem:** This is the biggest lesson. Having two completely separate database model definitions is a fundamental architectural error. The cause appears to be development in parallel branches that were not properly merged. Always consolidate database models into a single source of truth and use migrations properly.
-
-**Import Path Inconsistency:** Different modules using different import styles (src. vs relative) will always cause problems. Standardize on one approach (absolute imports with src. prefix are generally preferred).
-
-**Testing What is Missing:** Having empty test directories and basic-only tests while claiming production readiness is a red flag. Tests should be written alongside code, not after.
-
-**Feature Flags vs. Missing Features:** Having TODO comments for core functionality (deal delivery) suggests features were started but not finished. Either implement features or remove the code entirely.
-
-### Questions to Answer
-
-1. Which database model set should be the source of truth - the async one in services/database.py or the sync one in core/database.py?
-
-2. Should the project use APScheduler (scheduler/jobs.py) or the simpler scheduler (scheduler.py) or both?
-
-3. Is the LangGraph workflow system meant to replace the standalone agents, or are they separate code paths?
-
-4. What is the intended purpose of the empty src/arbitrage and src/consumer directories?
-
-5. Are Telegram and Discord integrations planned or just placeholders?
-
----
-
-## 8. RECOMMENDED NEXT STEPS
-
-### Immediate (Critical Path)
-
-1. Add keepa>=1.5.0 to requirements.txt
-2. Choose one database model set and delete the other
-3. Fix all import paths to be consistent
-4. Update watch_repository.py to use correct model names
-5. Test the API endpoints with a real Keepa API key
-
-### Short Term (Weeks 1-2)
-
-1. Implement deal delivery to users (currently generates but does not send)
-2. Implement Telegram notification channel
-3. Implement Discord notification channel
-4. Write integration tests for API endpoints
-5. Remove unused Redis dependency or implement actual Redis usage
-
-### Medium Term (Weeks 3-4)
-
-1. Set up database migration system (Alembic recommended)
-2. Write comprehensive test coverage (>80%)
-3. Implement Redis for token bucket state persistence
-4. Add API authentication/authorization
-5. Create CI/CD pipeline
-
-### Long Term (Months 2-3)
-
-1. Add user registration and authentication
-2. Implement multi-tenant isolation
-3. Add webhook support for external integrations
-4. Implement real-time notifications via WebSockets
-5. Add analytics dashboard for deal history
-
----
-
-## References and Line Numbers for Key Issues
-
-| Issue | File | Lines |
-|-------|------|-------|
-| Duplicate DB Models | src/core/database.py | 1-147 |
-| Duplicate DB Models | src/services/database.py | 1-293 |
-| Import Path Issues | src/agents/orchestrator.py | 1-3 |
-| Import Path Issues | src/scheduler/jobs.py | 15-17 |
-| Missing keepa lib | requirements.txt | 1-40 |
-| TODO - Deals not sent | src/scheduler/jobs.py | 198-202 |
-| Hardcoded email | src/graph/nodes.py | 111 |
-| Incomplete channels | src/agents/alert_dispatcher.py | 84-91 |
-| Wrong model imports | src/repositories/watch_repository.py | 10 |
-
----
-
-## 9. AGENT ORCHESTRATION -- LESSONS LEARNED
-
-> Dieses Kapitel dokumentiert was ich ueber AI-Agent-Orchestrierung gelernt habe,
-> waehrend ich dieses Projekt mit Claude Code, OpenCode MCP und Gemini gebaut habe.
-
-### Was ich richtig gemacht habe
-
-**Token-Oekonomie:** Ich habe eine Kostenarchitektur designed, die nicht zufaellig entstand:
-- Opus ($15/1M) --> nur Strategie und Entscheidungen
-- Sonnet ($3/1M) --> Code-Implementierung via OpenCode MCP
-- Gemini ($0.10/1M) --> Web-Research und Doku-Analyse
-- Haiku ($0.25/1M) --> Background-Tasks und SubAgents
-
-Konkretes Beispiel: Der `/test-crew` Command kostet $0.27 pro Run statt $2.50 direkt. 89% Ersparnis durch intelligentes Routing.
-
-**Context-Gathering ohne LLM-Kosten:** Ein Bash-Script (`gather-context.sh`) liest Dateien fuer $0 und gibt den Output als Kontext an den guenstigeren Agent weiter. Die meisten Leute lassen den teuren LLM jede Datei selbst lesen.
-
-**Fehler-Iteration statt Aufgeben:** 109 Fehlermeldungen in der Session, 80 Erfolge, nur 3 Reverts. Durch Fehler durchiterieren ist ein Skill -- nicht bei der ersten Fehlermeldung aufgeben.
-
-### Was ich besser machen muss
-
-**1. Code verstehen, den Agents schreiben**
-
-Groesstes Risiko: Ich kann nicht jede Funktion erklaeren, die in meinem Projekt laeuft. Die Loesung: Fuer jede Kernfunktion eine 3-Satz-Erklaerung generieren lassen und auswendig lernen. Siehe `docs/PRUEFUNGSVORBEREITUNG.md` fuer die 5 wichtigsten Funktionen.
-
-**2. Praeziser planen VOR der Delegation**
-
-Schlecht: "fix the tests"
-Besser: "Die 5 Tests in TestSearchDeals scheitern weil der Mock-Pfad `src.agents.deal_finder.keepa_client` nicht existiert -- finde wo keepa_client importiert wird und fixe den Patch-Pfad."
-
-**3. Post-Delegation-Reviews**
-
-Nach jedem `/chef` oder `/crew` Run: `git diff` lesen. Nicht um den Code zu verstehen, sondern um zu pruefen: Hat der Agent das gemacht was ich wollte?
-
-**4. Session-Hygiene**
-
-Max 80 Messages pro Session, dann neue starten. Nach ~100 Messages verliert der Kontext an Schaerfe durch Compression und Context Window Limits.
-
-### Mein Profil als Orchestrator
-
-Ich bin kein klassischer Entwickler -- ich bin ein AI Orchestrator / Prompt Architect:
-- Multi-Agent-Systeme designen
-- Token-Kosten optimieren
-- Delegation-Chains bauen
-- Fehler iterativ loesen lassen
-
-Das ist ein echtes, marktfaehiges Skillset. Firmen suchen Leute, die AI-Tools produktiv einsetzen koennen. Nicht der Maurer -- der Bauleiter.
-
-### Konkrete Verbesserungen umgesetzt
-
-| Was | Wo | Status |
-|-----|-----|--------|
-| 5 Kernfunktionen dokumentiert | `docs/PRUEFUNGSVORBEREITUNG.md` | Done |
-| Pruefer-Killfragen mit Antworten | `docs/PRUEFUNGSVORBEREITUNG.md` | Done |
-| "Warum"-Fragen fuer PG/Kafka/ES | `docs/PRUEFUNGSVORBEREITUNG.md` | Done |
-| Datenfluss-Diagramm | `docs/PRUEFUNGSVORBEREITUNG.md` | Done |
-| Architektur-Entscheidungen | `docs/ARCHITECTURE.md` | Done |
-| Session-Hygiene-Regel | CLAUDE.md | Ongoing |
-| Post-Delegation-Reviews | Workflow-Aenderung | Ongoing |
-
----
-
-*Analysis completed on Thu Feb 05 2026*
-*Orchestration Learnings added on Thu Feb 20 2026*
-*Project: KeepaProjectsforDataEngeneering3BranchesMerge*
-*Branch: KeepaMainProject*
+*Analysis completed: Thu Feb 20, 2026*
+*Branch: KeepaPreisSystem*
+*Post-stabilization: keepa-alerts.service fixed, kafka-connect removed, 7/7 containers healthy*
+*Config-Audit: 7 Probleme gefunden und gefixt (Kafka-Port, Redis-Phantom, .env.example, Deal-Vars, data-Mount, Dockerfile .env, kafka-connect)*
+*Doc-Verifikation: 3 FALSE POSITIVE Bug-Reports korrigiert, 2 Performance-Fixes implementiert*

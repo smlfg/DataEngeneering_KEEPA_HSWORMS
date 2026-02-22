@@ -4,6 +4,7 @@ Uses SQLAlchemy with async support for PostgreSQL
 """
 
 import uuid
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import Enum
@@ -26,6 +27,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.future import select
 from src.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 # Create async engine
@@ -477,6 +480,19 @@ async def save_collected_deals_batch(deals: List[Dict]) -> int:
     return saved
 
 
+async def get_latest_deal_price(asin: str) -> Optional[float]:
+    """Get the most recent price for an ASIN from collected_deals table."""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(CollectedDeal.current_price)
+            .where(CollectedDeal.asin == asin, CollectedDeal.current_price > 0)
+            .order_by(CollectedDeal.collected_at.desc())
+            .limit(1)
+        )
+        row = result.scalar_one_or_none()
+        return float(row) if row else None
+
+
 async def get_best_deals(
     min_discount: float = 30,
     min_rating: float = 4.0,
@@ -502,3 +518,161 @@ async def get_best_deals(
             .limit(limit)
         )
         return list(result.scalars().all())
+
+
+# System user for auto-tracked products
+SYSTEM_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
+async def get_or_create_system_user() -> User:
+    """Get or create the system user for auto-tracked products."""
+    async with async_session_maker() as session:
+        result = await session.execute(select(User).where(User.id == SYSTEM_USER_ID))
+        user = result.scalars().first()
+        if user:
+            return user
+        user = User(
+            id=SYSTEM_USER_ID,
+            email="system@keeper.internal",
+            is_active=True,
+        )
+        session.add(user)
+        try:
+            await session.commit()
+            await session.refresh(user)
+        except Exception:
+            await session.rollback()
+            result = await session.execute(
+                select(User).where(User.id == SYSTEM_USER_ID)
+            )
+            user = result.scalars().first()
+        return user
+
+
+async def ensure_tracked_product(
+    asin: str, title: str = None, current_price: float = None, domain: str = "de"
+) -> uuid.UUID:
+    """Ensure an ASIN is tracked as a WatchedProduct. Returns watch_id."""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(WatchedProduct).where(
+                WatchedProduct.asin == asin,
+                WatchedProduct.user_id == SYSTEM_USER_ID,
+            )
+        )
+        watch = result.scalars().first()
+        if watch:
+            return watch.id
+
+        await get_or_create_system_user()
+
+        watch = WatchedProduct(
+            user_id=SYSTEM_USER_ID,
+            asin=asin,
+            product_name=title,
+            target_price=0.0,
+            current_price=current_price,
+            status=WatchStatus.ACTIVE,
+        )
+        session.add(watch)
+        try:
+            await session.commit()
+            await session.refresh(watch)
+            return watch.id
+        except Exception:
+            await session.rollback()
+            result = await session.execute(
+                select(WatchedProduct).where(
+                    WatchedProduct.asin == asin,
+                    WatchedProduct.user_id == SYSTEM_USER_ID,
+                )
+            )
+            watch = result.scalars().first()
+            return watch.id if watch else None
+
+
+async def record_deal_price(
+    asin: str,
+    price: float,
+    title: str = None,
+    source: str = "deals_api",
+    recorded_at: datetime = None,
+) -> bool:
+    """Record a price point from a deal snapshot into price_history."""
+    if price <= 0:
+        return False
+
+    watch_id = await ensure_tracked_product(asin, title=title, current_price=price)
+    if not watch_id:
+        return False
+
+    async with async_session_maker() as session:
+        history = PriceHistory(
+            watch_id=watch_id,
+            price=price,
+            buy_box_seller=source,
+            recorded_at=recorded_at or datetime.utcnow(),
+        )
+        session.add(history)
+
+        result = await session.execute(
+            select(WatchedProduct).where(WatchedProduct.id == watch_id)
+        )
+        watch = result.scalars().first()
+        if watch:
+            watch.current_price = price
+            watch.last_checked_at = datetime.utcnow()
+
+        await session.commit()
+        return True
+
+
+async def backfill_price_history_from_deals() -> int:
+    """Backfill price_history from existing collected_deals. Idempotent."""
+    from sqlalchemy import func, distinct
+
+    async with async_session_maker() as session:
+        existing = await session.execute(
+            select(func.count())
+            .select_from(PriceHistory)
+            .join(WatchedProduct, PriceHistory.watch_id == WatchedProduct.id)
+            .where(WatchedProduct.user_id == SYSTEM_USER_ID)
+        )
+        if existing.scalar() > 0:
+            logger.info("Backfill already done, skipping")
+            return 0
+
+    async with async_session_maker() as session:
+        asins_result = await session.execute(
+            select(distinct(CollectedDeal.asin)).where(CollectedDeal.current_price > 0)
+        )
+        asins = [row[0] for row in asins_result.all()]
+
+    if not asins:
+        logger.info("No collected deals to backfill")
+        return 0
+
+    total = 0
+    for asin in asins:
+        async with async_session_maker() as session:
+            deals = await session.execute(
+                select(CollectedDeal)
+                .where(
+                    CollectedDeal.asin == asin,
+                    CollectedDeal.current_price > 0,
+                )
+                .order_by(CollectedDeal.collected_at)
+            )
+            for deal in deals.scalars().all():
+                success = await record_deal_price(
+                    asin=deal.asin,
+                    price=deal.current_price,
+                    title=deal.title,
+                    source="backfill",
+                    recorded_at=deal.collected_at,
+                )
+                if success:
+                    total += 1
+
+    logger.info(f"Backfilled {total} price history records from {len(asins)} ASINs")
+    return total

@@ -9,9 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Code
 COPY src/ ./src/
 COPY prompts/ ./prompts/
-
-# Environment
-COPY .env.example .env
+COPY data/ ./data/
 
 EXPOSE 8000
 

@@ -47,7 +47,7 @@
 - `GET /api/v1/status` – token bucket + Keepa rate-limit info.
 - `GET /api/v1/watches?user_id=` – list user watches (async DB).
 - `POST /api/v1/watches` – create watch after Keepa price fetch; validates ASIN length and target > 0.
-- `DELETE /api/v1/watches/{id}` – placeholder returns success without DB mutation.
+- `DELETE /api/v1/watches/{id}` – soft-deletes watch (sets status to 'inactive').
 - `POST /api/v1/price/check` – manual price lookup via Keepa.
 - `POST /api/v1/price/check-all` – runs async scheduler `run_immediate_check`.
 - `POST /api/v1/deals/search` – filters deals; **bug:** calls async `client.search_deals` without `await`, so coroutine is returned instead of data; filter fields partly unused.
@@ -68,15 +68,19 @@
 - Alert Dispatcher: rate limit 10 alerts/hour/user, duplicate window 1h, retries with delays [0, 30s, 120s]; fallback channels noted in prompt though code only emails.
 
 ## Risks & Gaps (prioritized)
-- **High — Dual DB schemas**: async (`services/database.py`) vs sync (`core/database.py`/`repositories`) cause diverging tables and model types; schedulers and API use different stacks. Consolidate to one schema and session type.
-- **High — Async bug in deals endpoint**: `client.search_deals` not awaited; endpoint returns coroutine and likely 500. Await call and adjust filters to Keepa wrapper signature.
-- **High — Keepa client initialization**: `Keepa` object created at import; failures set `_is_initialized=False` and later calls raise, but API endpoints don’t handle initialization failure gracefully.
+
+> **Update 20.02.2026:** Manual code review found that 3 of the original HIGH-priority items were false positives. The automated deep-dive was generated before the codebase was consolidated from 3 branches into one. Corrections below.
+
+- ~~**High — Dual DB schemas**~~: **FALSE POSITIVE.** The sync stack (`core/database.py`, `repositories/`) exists only in the `Input/` reference folder — it is never imported by the active codebase. The running system uses a single async schema in `services/database.py`.
+- ~~**High — Async bug in deals endpoint**~~: **FALSE POSITIVE.** All `await` calls are present and correct in the current code. The deals search uses the Keepa product API fallback (not the deals endpoint) which works on our plan tier.
+- **High — Keepa client initialization**: `Keepa` object created at import; failures set `_is_initialized=False` and later calls raise, but API endpoints don’t handle initialization failure gracefully. *(Still valid.)*
 - **Medium — Notification channels**: Telegram/Discord referenced in prompts and alert logic but not implemented in `notification_service` or `alert_dispatcher.send_alert`.
-- **Medium — Scheduler parity**: APScheduler jobs use sync repo stack; async scheduler uses async stack; risk of duplicate checks and inconsistent data if both run.
-- **Medium — Delete watch endpoint**: returns success without DB change; can mislead clients.
-- **Low — Health count**: watches_count hardcoded 0; should query DB.
+- ~~**Medium — Delete watch endpoint**~~: **FALSE POSITIVE.** The DELETE endpoint performs a real soft-delete (`status = ‘inactive’`) with DB commit. Verified in `src/api/main.py`.
+- **Medium — Sequential API calls in price_monitor.py**: `fetch_prices()` and `check_prices()` used sequential loops. **RESOLVED 20.02.2026** — parallelized with `asyncio.gather()` + `Semaphore(5)`.
+- **Medium — Sequential seed ASIN fallback**: `_collect_seed_asin_deals()` in scheduler.py queried ASINs one by one. **RESOLVED 20.02.2026** — parallelized with `asyncio.gather()` + `Semaphore(5)`.
+- **Low — Health count**: watches_count now queries DB correctly (fixed during config consolidation).
 - **Low — Tests**: only price monitor interval/volatility tests; no coverage for API, Keepa client, schedulers, or alert logic.
-- **Low — Logging/observability**: minimal structured logging; prompts prescribe audit logs but code largely silent aside from scheduler logs.
+- **Low — Logging/observability**: Pipeline logger (`src/utils/pipeline_logger.py`) now provides structured JSON logging for all pipeline stages.
 
 ## Testing Status & Recommendations
 - Current automated tests: `tests/test_agents/test_price_monitor.py` only; pytest not installed in env (command failed).
@@ -88,12 +92,15 @@
   - Deal scoring and spam filter tests with edge cases.
 
 ## Next Steps (suggested)
-1) Unify database schema (choose async or sync), migrate repositories/schedulers to it, and remove the duplicate stack.
-2) Fix async bug in `/api/v1/deals/search`; add proper filter plumbing to Keepa wrapper.
+
+> **Update 20.02.2026:** Items 1, 2, 4 are resolved. Remaining items reprioritized.
+
+1) ~~Unify database schema~~ — **DONE.** Active codebase uses single async stack. Sync stack is reference-only in `Input/`.
+2) ~~Fix async bug in deals search~~ — **NOT A BUG.** Code uses product API fallback correctly; deals endpoint not available on our Keepa plan tier.
 3) Implement missing notification channels or strip from prompts until supported.
-4) Make delete watch endpoint perform soft delete/inactivation.
-5) Add pytest dependency and expand test suite as outlined; wire CI.
-6) Enhance health/status endpoints with real counts and error surfacing.
+4) ~~Make delete watch endpoint perform soft delete~~ — **ALREADY IMPLEMENTED.**
+5) Expand test suite (Kafka producer/consumer, ES service, pipeline logger tests added; more coverage needed for API and alert logic).
+6) Implement Keepa batch queries (up to 10 ASINs per call) to reduce token consumption by ~90%.
 
 ## Glossary
 - **ASIN**: Amazon Standard Identification Number (10-char).

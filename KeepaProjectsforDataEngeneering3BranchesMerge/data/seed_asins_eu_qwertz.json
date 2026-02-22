@@ -1,29 +1,30 @@
 {
-  "generated_at": "2026-02-19T01:08:02.897449+00:00",
+  "generated_at": "2026-02-22T05:00:18.298951+00:00",
   "stats": {
-    "requests_total": 33,
-    "requests_query": 20,
-    "requests_search": 13,
-    "requests_bestsellers": 0,
+    "requests_total": 246,
+    "requests_query": 40,
+    "requests_search": 17,
+    "requests_bestsellers": 189,
     "requests_product": 0,
-    "request_errors": 33,
-    "tokens_consumed_total": 0,
-    "finder_asins": 0,
-    "bestseller_asins": 0,
+    "request_errors": 202,
+    "tokens_consumed_total": 1213,
+    "finder_asins": 452,
+    "bestseller_asins": 31685,
     "validated_checked": 0,
     "validated_ok": 0
   },
   "run": {
     "markets": [
+      "DE",
       "UK",
       "FR",
       "IT",
       "ES"
     ],
-    "seed_limit": 1000,
-    "finder_pages": 10,
-    "finder_per_page": 600,
-    "max_categories": 100,
+    "seed_limit": 500,
+    "finder_pages": 8,
+    "finder_per_page": 500,
+    "max_categories": 80,
     "bestseller_ranges": [
       0,
       30,
@@ -37,13 +38,4544 @@
     "max_price": 800.0,
     "validate_count": 0,
     "category_ids_by_market": {
+      "DE": [
+        6755381031,
+        430253031,
+        2860324031,
+        430221031,
+        68744031,
+        14054303031,
+        429867031,
+        1499978031,
+        12724476031,
+        193545031,
+        12851531,
+        5725491031,
+        430220031,
+        1198990,
+        6833283031,
+        14026231,
+        430065031,
+        299839031,
+        21617866031,
+        201173384031,
+        9579614031,
+        4222216031,
+        4361454031,
+        4730574031,
+        202890031,
+        202826031,
+        9579932031
+      ],
       "UK": [],
       "FR": [],
       "IT": [],
       "ES": []
     },
-    "discovered_unique_total": 0
+    "discovered_unique_total": 10396
   },
-  "asins": [],
-  "records": []
+  "asins": [
+    "B0FNWCN25B",
+    "B01EIICVNS",
+    "B0D24YHWY1",
+    "B0F4KD565F",
+    "B0DQDSLSKH",
+    "B07NL7C7M9",
+    "B0DCFLXMBD",
+    "B0B9XP6N5Q",
+    "B0BBM3W9QV",
+    "B08NWSQZBH",
+    "B0DJ5LXG6N",
+    "B0DNXJ643L",
+    "B0BGN46XZB",
+    "B07XPTNS8Z",
+    "B0CYV86HPX",
+    "B0DJCRKCHN",
+    "B085HQBK2P",
+    "B0B8HCS9M7",
+    "B0DW82Z876",
+    "B0F37L6PGW",
+    "B0DTP8438Y",
+    "B0DT5YSCM3",
+    "B0DRTWWD29",
+    "B0DRNC8KGX",
+    "B0DQWYFJD6",
+    "B0FN7Y85JH",
+    "B0F2DFCCFN",
+    "B0DSB7NNK6",
+    "B0DRS1V1J7",
+    "B0FY3QQNSR",
+    "B0DFV7T8QY",
+    "B0DBHKTTVH",
+    "B0DFV88W1F",
+    "B0DZH5WZ1B",
+    "B0DR46V45R",
+    "B0DWCVCPQZ",
+    "B0DGG1BQWZ",
+    "B0FJCKXR2S",
+    "B0DJ8B4X7M",
+    "B0F2ZY64TB",
+    "B0DFV8BJDV",
+    "B091HRW3MT",
+    "B0F4KWZ193",
+    "B06XDRMCZH",
+    "B0F1F89ZL1",
+    "B0DLFQLZH8",
+    "B0DQ4GT2Z2",
+    "B0F1SY2F4B",
+    "B0DRN62DZH",
+    "B0DRN1XFGF",
+    "B081KT9ZDH",
+    "B0DPSG4566",
+    "B0DRTYBM19",
+    "B0DM7FFR6Y",
+    "B0DRMXQ779",
+    "B0F12ZQW5J",
+    "B0FH626JT1",
+    "B0DNVS6LB6",
+    "B0DGG25M8T",
+    "B07DHJ8FZ5",
+    "B0F1SRBRKT",
+    "B0DRZW6D49",
+    "B0DT9293NF",
+    "B0DS8SXRHR",
+    "B0DRBJ998V",
+    "B0DR14BVHG",
+    "B0FBP5WG6Y",
+    "B0F12WBF3W",
+    "B0CHJT28GM",
+    "B0G9XWMSMH",
+    "B0DGFZNBRK",
+    "B0DRRRBBT5",
+    "B0DRX9V7P2",
+    "B079KK47FM",
+    "B0F2MBKW3C",
+    "B06XDQHTZ1",
+    "B07GL8FXG2",
+    "B0F23QZRDN",
+    "B0F1XRV96H",
+    "B0DK3PMZ3J",
+    "B0DMJB4TVG",
+    "B0FKH94SSZ",
+    "B0F12W3TN1",
+    "B0DZ1YNJ9C",
+    "B0DNYHWQP9",
+    "B0DRX9YJQ2",
+    "B0FXNFJZK4",
+    "B0DJ6N9VD5",
+    "B0DTTBJ39Y",
+    "B07MZRBCGS",
+    "B0DTNZSKFJ",
+    "B0DSMF3JFH",
+    "B073TVPDYP",
+    "B0FRYYJH2X",
+    "B0FVV472YK",
+    "B0DK5LWR7K",
+    "B000791D6E",
+    "B0F1XRFJDP",
+    "B0FT1RVSRR",
+    "B0DV3L77X5",
+    "B0DMLM1V9Q",
+    "B0FVLWWJ6J",
+    "B089FJMCCQ",
+    "B08316ZX5T",
+    "B0DRRJ8L6M",
+    "B0F2S9SF9X",
+    "B0D1RL7RDR",
+    "B0F12VDTQL",
+    "B0DS51D131",
+    "B0DJ5LCD2Y",
+    "B0DT5XGWYF",
+    "B0DT5CX31C",
+    "B07F8T2GPG",
+    "B0DRN9TMQ1",
+    "B07D28W7R2",
+    "B091HT9SJQ",
+    "B0FJCL8NMM",
+    "B0DYJ1T8DG",
+    "B06XDFQM6F",
+    "B0F28R4XM4",
+    "B0F28QWYQL",
+    "B0DR48H1G6",
+    "B0DYZS6VLQ",
+    "B0DRND83W5",
+    "B0DT3T9686",
+    "B07FXWCJ59",
+    "B0DFTQPNDS",
+    "B0DTYWLQQ2",
+    "B099K95SRN",
+    "B0DRZWRPJ3",
+    "B07C41DNT6",
+    "B0DRN7F8HC",
+    "B0DZGL3LF5",
+    "B0F23PK4TN",
+    "B0DRX8NSB6",
+    "B08XMHF681",
+    "B073QHLFNP",
+    "B0DNYNWLDS",
+    "B0F2SRCH4Y",
+    "B0G653HKX7",
+    "B0DFTNN2WJ",
+    "B0F3HN6Z3Z",
+    "B0DNYJ27M4",
+    "B0DRRJFBWT",
+    "B0F3TT8M9M",
+    "B09K3HSNJ7",
+    "B0DPL1WQWB",
+    "B0DYZC3F2G",
+    "B0DR15QK15",
+    "B0BXJ95SM2",
+    "B0G18PYLW6",
+    "B0G2TBHG4B",
+    "B0DYNNXFHG",
+    "B0F1F92RHY",
+    "B0DZCL8WVD",
+    "B0F4Y162PQ",
+    "B0DRF6DMJW",
+    "B0DRTXM1FQ",
+    "B0DYNTSPXC",
+    "B0DRTZ4TYC",
+    "B073QHPKQ2",
+    "B0GG5QLDPM",
+    "B08Y7TYWTY",
+    "B0DJZ7ZLWH",
+    "B0DJGV9Y3T",
+    "B07BP92SX9",
+    "B0DJT47MDK",
+    "B0DZ1WQNRJ",
+    "B0009A1ZJQ",
+    "B0DT4LFVPW",
+    "B07C83721P",
+    "B0DZCM6H76",
+    "B0DGG3BYNW",
+    "B0DTYMY2CT",
+    "B0DYY84JHW",
+    "B0DHTR1CV2",
+    "B0DTSRZ9KH",
+    "B073QHHZB5",
+    "B0DT927PRZ",
+    "B0DHTQSSJ7",
+    "B0DJT4R64P",
+    "B0DYZD29SV",
+    "B0DZ1W9CLT",
+    "B0DRTYPFK6",
+    "B07F3YHSGF",
+    "B099QL66LP",
+    "B0DRHQS4LB",
+    "B0DRRMR8MT",
+    "B095HSJMQ5",
+    "B0DSZCYHZ6",
+    "B0DRBHL1S3",
+    "B0DV59B2V8",
+    "B0DGFPJ53J",
+    "B0DRZWLJRB",
+    "B0DLS24TLC",
+    "B07B22CKGJ",
+    "B0F12VNK4P",
+    "B0DRNFFRJD",
+    "B0F218TQ47",
+    "B0DRRTH1NZ",
+    "B0F375WZGV",
+    "B0DHQBL9NN",
+    "B00CN7S834",
+    "B0FCCN3NX5",
+    "B0F12XMCYR",
+    "B0F1JRDQN7",
+    "B0C61MGDQQ",
+    "B07D3198GL",
+    "B0DK3DKJ5Y",
+    "B0DJ5MPXRS",
+    "B0DRHT29V6",
+    "B097Q7PXKZ",
+    "B0DJJJ5NB5",
+    "B099QK2YSQ",
+    "B0DT5MS38H",
+    "B0F18XVDF1",
+    "B0FK5N3MMS",
+    "B0DJZ6B2NF",
+    "B0FXN9G7DM",
+    "B000BVAN7I",
+    "B0F1T2ZNFJ",
+    "B0DS79NMDB",
+    "B0DLRKZ5KV",
+    "B0DNHGKTK9",
+    "B0DRNFHQ1C",
+    "B00CYLUWDI",
+    "B07B91Y8NS",
+    "B0F28QR1C7",
+    "B0DR49XTYC",
+    "B0DZGNVSQH",
+    "B0DT443YJY",
+    "B0DHRG62ZV",
+    "B0F88WM8CK",
+    "B0DR12YLP6",
+    "B0DV59X1SQ",
+    "B0DNH5VRMS",
+    "B0DSYSKZ7G",
+    "B0GG5Q15KQ",
+    "B0DYNQ6TP9",
+    "B0F23QFRJR",
+    "B0F5P44LF2",
+    "B0GK739ZJ8",
+    "B0DZ1Y1LC7",
+    "B0006GAVIO",
+    "B0DK3G46Z3",
+    "B0FHVHWMMF",
+    "B0F2MC8WB3",
+    "B0DT9427PG",
+    "B0DTTV5W54",
+    "B0DRRDV2Y9",
+    "B099K2RR4P",
+    "B08XMM356Q",
+    "B0FHHKWXL6",
+    "B0DRHRW7J5",
+    "B073TVJ4R2",
+    "B0DZ674ZJL",
+    "B0DFPNK1JG",
+    "B0FYHNV41S",
+    "B0F28QR1C8",
+    "B000JWGJNG",
+    "B0BVZL3HTM",
+    "B0DR1KVD1T",
+    "B0DKG5F449",
+    "B0DS1LCBLW",
+    "B07C961DZK",
+    "B0DS1P17Y4",
+    "B0DTP6SXQJ",
+    "B0DRXB6XWD",
+    "B07D13DG8D",
+    "B0F215JM3B",
+    "B0G6BJ1167",
+    "B0F2166R6X",
+    "B0DZCKSJZJ",
+    "B0DZCMNWZT",
+    "B0DTHFLGNW",
+    "B01L6L451Q",
+    "B09X5YRBF9",
+    "B09NC1N5QD",
+    "B09NB9DGWT",
+    "B08GCSQRZW",
+    "B0DHP1QVXB",
+    "B08F34T2YQ",
+    "B0CQ7ZTB8G",
+    "B0DDT8YRWT",
+    "B09FQ98HRT",
+    "B0C1GYJXPL",
+    "B01MRH2VSL",
+    "B0CGW81BPJ",
+    "B0DR31MWKM",
+    "B09KWYYZ3K",
+    "B0D2KL45P5",
+    "B0BRCLXHNN",
+    "B0B4W52FN5",
+    "B082TVX73C",
+    "B0CQKMKPZW",
+    "B08X65XX2J",
+    "B0FDFRW7W1",
+    "B083M9CBD5",
+    "B0D6YC84SP",
+    "B0DXFR2QJW",
+    "B086DC4MRL",
+    "B0F3XQB3Z9",
+    "B0DW9KLBLG",
+    "B0CH9NWPX4",
+    "B0BRZ4HZHW",
+    "B09G2WRZ52",
+    "B07Q2Q2K6Z",
+    "B0FFH3Y529",
+    "B0FP32C3VG",
+    "B0F53GWXWL",
+    "B077T9391Z",
+    "B07W7L7S6W",
+    "B0DH2LZ4XM",
+    "B0BN52WRF8",
+    "B0D5M854QW",
+    "B089NHZT5J",
+    "B0G7HKKZGH",
+    "B09LYWYDX4",
+    "B0DFHFR5S2",
+    "B0B96BN5HT",
+    "B0CCB259Q7",
+    "B07ZTLZMBW",
+    "B0BC8KSNVT",
+    "B0DJX23WHW",
+    "B07FLYR1TG",
+    "B0DWMX5TXV",
+    "B0D9M5Y1LY",
+    "B0CJY1GBYP",
+    "B0DFXWQWB8",
+    "B0F6CTTNYQ",
+    "B07FPGQ933",
+    "B08JYQRCFH",
+    "B0DGLD6RGK",
+    "B0CP8V6TDK",
+    "B0DR2RMYJ1",
+    "B09VBBP822",
+    "B0B5XR46LY",
+    "B0FBS6X4NX",
+    "B0D4Q6WWR5",
+    "B0CCXL6CB3",
+    "B0FFLJLKVJ",
+    "B0F3884JY6",
+    "B0DZCYNZ8R",
+    "B099W79T6N",
+    "B0FC62VJRB",
+    "B0DWFRSGFZ",
+    "B0CYT2WQXK",
+    "B0G3GK968S",
+    "B0CQ55W9RY",
+    "B0FMKDWD5N",
+    "B0CZCMK3SB",
+    "B0FLX78XVF",
+    "B01ICUW9LW",
+    "B0B3N9LWT3",
+    "B081QNQKG1",
+    "B0FMFB2Y2P",
+    "B0FG85MKT1",
+    "B0FKGLJP9M",
+    "B07P4M5K44",
+    "B0DZ66T8DN",
+    "B0FVY2NGPS",
+    "B0DK9S97CG",
+    "B0D7HCZSRP",
+    "B0B8NH1VT7",
+    "B0DGXCZN4B",
+    "B0FCYCCJY7",
+    "B0FD3FQZHN",
+    "B0CT4ZNBQ8",
+    "B0D3GZYN1P",
+    "B0BG27GMJZ",
+    "B0DDTB5CV1",
+    "B0FD3NBQGY",
+    "B07W6H32W5",
+    "B0F3858HW2",
+    "B0FZC659VY",
+    "B0D5HBZ3V9",
+    "B0FF9GS74F",
+    "B0DQLP19TV",
+    "B0DG35H9PT",
+    "B0CYLB65DS",
+    "B0FB98GD4R",
+    "B0F9WP7XW3",
+    "B0B4SBVTH7",
+    "B0B7P2G88R",
+    "B0BFFV5BTL",
+    "B0FH1FPQR2",
+    "B0CL4HSDT6",
+    "B0FGJHGYJ9",
+    "B09N54SL1L",
+    "B0DHVQCSS6",
+    "B0FYPD74J5",
+    "B0FS1RLBRR",
+    "B07W6J7FWL",
+    "B0DWJVLMTB",
+    "B0DVZCB7JD",
+    "B0F5Q7DBM7",
+    "B0CJ8Z2FY5",
+    "B0FD3PNWBB",
+    "B0DF7DXFVD",
+    "B095PNMTGR",
+    "B0DSFR5NDW",
+    "B0GCMLGPMV",
+    "B0FHVTSVG7",
+    "B07RM115CJ",
+    "B08JTK1FZ5",
+    "B0F6D6QXCX",
+    "B0DG1NZ4CV",
+    "B0BVG2X2F2",
+    "B0CMXT1CMV",
+    "B0DT72YTTB",
+    "B0FB37NC1D",
+    "B0DZ676F3R",
+    "B09FYCXL7R",
+    "B09Y668V46",
+    "B083K6WMSQ",
+    "B09VCBKCFW",
+    "B0FBW4MLDJ",
+    "B0B4V9DHKY",
+    "B0CQ2MSP2B",
+    "B0FCLTX5RV",
+    "B0DHCF13Q6",
+    "B0875T785P",
+    "B0FJG96MSL",
+    "B07L47XYSX",
+    "B07T4VRZCK",
+    "B01HXI1OF6",
+    "B08BNQXSM1",
+    "B0G6JZ1THM",
+    "B08NG84G7P",
+    "B07W6GRN1Y",
+    "B0FB9HDNC5",
+    "B0DLNXRH19",
+    "B0731H35J8",
+    "B0CSNJNMJY",
+    "B0FS1XPTCL",
+    "B0BZC3V6PM",
+    "B0F6MFNB1C",
+    "B0FDZQTD73",
+    "B0DBQ2SPZL",
+    "B0191YRL6Q",
+    "B0C4YT9SCM",
+    "B0FB9B6GPS",
+    "B0FX4PBX6H",
+    "B0DD3WFTJN",
+    "B0BJ35GBX2",
+    "B0FX2DJYGX",
+    "B0CGD3HXXZ",
+    "B0D4QN5274",
+    "B0CJXVR7CW",
+    "B0DXV4R8YP",
+    "B0FSRVHD6R",
+    "B0C77C3LWG",
+    "B0BNPNTLQH",
+    "B0FY3618X7",
+    "B0DZTBWB4P",
+    "B0CLG95X4G",
+    "B0CW1T7CHT",
+    "B07GXXC451",
+    "B0CTKMBR7L",
+    "B0DHRHC4SQ",
+    "B0F6CK2ZBM",
+    "B0DW3V9L1T",
+    "B0FNRZ4HPC",
+    "B092V8R2RY",
+    "B0C2928RZZ",
+    "B0F7R5G19S",
+    "B09XHZSBBL",
+    "B0CPXHFB8G",
+    "B005LVMSS0",
+    "B0FPFQ8Y98",
+    "B09BLNHS1N",
+    "B0DKNFPVT9",
+    "B0CZDJPN9T",
+    "B0DDTDVXVW",
+    "B09MDZY68V",
+    "B0CFTCQLKW",
+    "B09DPRV9FW",
+    "B0FMFGR8GQ",
+    "B0CP698TBT",
+    "B0CCXCLDCH",
+    "B0DLL262HX",
+    "B09XDS5HBD",
+    "B0DSDPTR87",
+    "B0DDP7HV3B",
+    "B0FSZ7GM6Z",
+    "B0779BY6RQ",
+    "B0FJLQWD5J",
+    "B0BZC186G6",
+    "B0DT6PZCBH",
+    "B0BHYRG6V8",
+    "B098Q7S9C2",
+    "B07F3MDC2Q",
+    "B0BY1CVFKP",
+    "B07CMKGJJH",
+    "B07G11G2X8",
+    "B07PNNHF1T",
+    "B0DT6SK85Y",
+    "B097BYFQNV",
+    "B0DPPR54CD",
+    "B0DSBSTMDZ"
+  ],
+  "records": [
+    {
+      "asin": "B0FNWCN25B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B01EIICVNS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0D24YHWY1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F4KD565F",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DQDSLSKH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07NL7C7M9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DCFLXMBD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0B9XP6N5Q",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0BBM3W9QV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B08NWSQZBH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJ5LXG6N",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DNXJ643L",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0BGN46XZB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07XPTNS8Z",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0CYV86HPX",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJCRKCHN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B085HQBK2P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0B8HCS9M7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DW82Z876",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F37L6PGW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTP8438Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT5YSCM3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRTWWD29",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRNC8KGX",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DQWYFJD6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FN7Y85JH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F2DFCCFN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DSB7NNK6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRS1V1J7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FY3QQNSR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DFV7T8QY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DBHKTTVH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DFV88W1F",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZH5WZ1B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DR46V45R",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DWCVCPQZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DGG1BQWZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FJCKXR2S",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJ8B4X7M",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F2ZY64TB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DFV8BJDV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B091HRW3MT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F4KWZ193",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B06XDRMCZH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1F89ZL1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DLFQLZH8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DQ4GT2Z2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1SY2F4B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRN62DZH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRN1XFGF",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B081KT9ZDH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DPSG4566",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRTYBM19",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DM7FFR6Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRMXQ779",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F12ZQW5J",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FH626JT1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DNVS6LB6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DGG25M8T",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07DHJ8FZ5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1SRBRKT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRZW6D49",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT9293NF",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DS8SXRHR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRBJ998V",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DR14BVHG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FBP5WG6Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F12WBF3W",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0CHJT28GM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0G9XWMSMH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DGFZNBRK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRRRBBT5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRX9V7P2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B079KK47FM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F2MBKW3C",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B06XDQHTZ1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07GL8FXG2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F23QZRDN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1XRV96H",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DK3PMZ3J",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DMJB4TVG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FKH94SSZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F12W3TN1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZ1YNJ9C",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DNYHWQP9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRX9YJQ2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FXNFJZK4",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJ6N9VD5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTTBJ39Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07MZRBCGS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTNZSKFJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DSMF3JFH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B073TVPDYP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FRYYJH2X",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FVV472YK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DK5LWR7K",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B000791D6E",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1XRFJDP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FT1RVSRR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DV3L77X5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DMLM1V9Q",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FVLWWJ6J",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B089FJMCCQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B08316ZX5T",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRRJ8L6M",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F2S9SF9X",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0D1RL7RDR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F12VDTQL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DS51D131",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJ5LCD2Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT5XGWYF",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT5CX31C",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07F8T2GPG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRN9TMQ1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07D28W7R2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B091HT9SJQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FJCL8NMM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYJ1T8DG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B06XDFQM6F",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F28R4XM4",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F28QWYQL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DR48H1G6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYZS6VLQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRND83W5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT3T9686",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07FXWCJ59",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DFTQPNDS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTYWLQQ2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B099K95SRN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRZWRPJ3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07C41DNT6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRN7F8HC",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZGL3LF5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F23PK4TN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRX8NSB6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B08XMHF681",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B073QHLFNP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DNYNWLDS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F2SRCH4Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0G653HKX7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DFTNN2WJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F3HN6Z3Z",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DNYJ27M4",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRRJFBWT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F3TT8M9M",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B09K3HSNJ7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DPL1WQWB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYZC3F2G",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DR15QK15",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0BXJ95SM2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0G18PYLW6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0G2TBHG4B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYNNXFHG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1F92RHY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZCL8WVD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F4Y162PQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRF6DMJW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRTXM1FQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYNTSPXC",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRTZ4TYC",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B073QHPKQ2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0GG5QLDPM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B08Y7TYWTY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJZ7ZLWH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJGV9Y3T",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07BP92SX9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJT47MDK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZ1WQNRJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0009A1ZJQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT4LFVPW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07C83721P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZCM6H76",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DGG3BYNW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTYMY2CT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYY84JHW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DHTR1CV2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTSRZ9KH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B073QHHZB5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT927PRZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DHTQSSJ7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJT4R64P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYZD29SV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZ1W9CLT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRTYPFK6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07F3YHSGF",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B099QL66LP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRHQS4LB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRRMR8MT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B095HSJMQ5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DSZCYHZ6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRBHL1S3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DV59B2V8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DGFPJ53J",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRZWLJRB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DLS24TLC",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07B22CKGJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F12VNK4P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRNFFRJD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F218TQ47",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRRTH1NZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F375WZGV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DHQBL9NN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B00CN7S834",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FCCN3NX5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F12XMCYR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1JRDQN7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0C61MGDQQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07D3198GL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DK3DKJ5Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJ5MPXRS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRHT29V6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B097Q7PXKZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJJJ5NB5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B099QK2YSQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT5MS38H",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F18XVDF1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FK5N3MMS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DJZ6B2NF",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FXN9G7DM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B000BVAN7I",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F1T2ZNFJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DS79NMDB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DLRKZ5KV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DNHGKTK9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRNFHQ1C",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B00CYLUWDI",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07B91Y8NS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F28QR1C7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DR49XTYC",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZGNVSQH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT443YJY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DHRG62ZV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F88WM8CK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DR12YLP6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DV59X1SQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DNH5VRMS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DSYSKZ7G",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0GG5Q15KQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DYNQ6TP9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F23QFRJR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F5P44LF2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0GK739ZJ8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZ1Y1LC7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0006GAVIO",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DK3G46Z3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FHVHWMMF",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F2MC8WB3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DT9427PG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTTV5W54",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRRDV2Y9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B099K2RR4P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B08XMM356Q",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FHHKWXL6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRHRW7J5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B073TVJ4R2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZ674ZJL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DFPNK1JG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0FYHNV41S",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F28QR1C8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B000JWGJNG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0BVZL3HTM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DR1KVD1T",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DKG5F449",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DS1LCBLW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07C961DZK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DS1P17Y4",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTP6SXQJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DRXB6XWD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B07D13DG8D",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F215JM3B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0G6BJ1167",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0F2166R6X",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZCKSJZJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DZCMNWZT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B0DTHFLGNW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "query",
+      "hint": "tastatur#p0",
+      "score": 3
+    },
+    {
+      "asin": "B01L6L451Q",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09X5YRBF9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09NC1N5QD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09NB9DGWT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B08GCSQRZW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DHP1QVXB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B08F34T2YQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CQ7ZTB8G",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DDT8YRWT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09FQ98HRT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0C1GYJXPL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B01MRH2VSL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CGW81BPJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DR31MWKM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09KWYYZ3K",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D2KL45P5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BRCLXHNN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B4W52FN5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B082TVX73C",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CQKMKPZW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B08X65XX2J",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FDFRW7W1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B083M9CBD5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D6YC84SP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DXFR2QJW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B086DC4MRL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F3XQB3Z9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DW9KLBLG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CH9NWPX4",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BRZ4HZHW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09G2WRZ52",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07Q2Q2K6Z",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FFH3Y529",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FP32C3VG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F53GWXWL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B077T9391Z",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07W7L7S6W",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DH2LZ4XM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BN52WRF8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D5M854QW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B089NHZT5J",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0G7HKKZGH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09LYWYDX4",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DFHFR5S2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B96BN5HT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CCB259Q7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07ZTLZMBW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BC8KSNVT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DJX23WHW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07FLYR1TG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DWMX5TXV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D9M5Y1LY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CJY1GBYP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DFXWQWB8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F6CTTNYQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07FPGQ933",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B08JYQRCFH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DGLD6RGK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CP8V6TDK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DR2RMYJ1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09VBBP822",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B5XR46LY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FBS6X4NX",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D4Q6WWR5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CCXL6CB3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FFLJLKVJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F3884JY6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DZCYNZ8R",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B099W79T6N",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FC62VJRB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DWFRSGFZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CYT2WQXK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0G3GK968S",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CQ55W9RY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FMKDWD5N",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CZCMK3SB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FLX78XVF",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B01ICUW9LW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B3N9LWT3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B081QNQKG1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FMFB2Y2P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FG85MKT1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FKGLJP9M",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07P4M5K44",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DZ66T8DN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FVY2NGPS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DK9S97CG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D7HCZSRP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B8NH1VT7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DGXCZN4B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FCYCCJY7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FD3FQZHN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CT4ZNBQ8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D3GZYN1P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BG27GMJZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DDTB5CV1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FD3NBQGY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07W6H32W5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F3858HW2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FZC659VY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D5HBZ3V9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FF9GS74F",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DQLP19TV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DG35H9PT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CYLB65DS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FB98GD4R",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F9WP7XW3",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B4SBVTH7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B7P2G88R",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BFFV5BTL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FH1FPQR2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CL4HSDT6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FGJHGYJ9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09N54SL1L",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DHVQCSS6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FYPD74J5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FS1RLBRR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07W6J7FWL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DWJVLMTB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DVZCB7JD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F5Q7DBM7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CJ8Z2FY5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FD3PNWBB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DF7DXFVD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B095PNMTGR",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DSFR5NDW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0GCMLGPMV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FHVTSVG7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07RM115CJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B08JTK1FZ5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F6D6QXCX",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DG1NZ4CV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BVG2X2F2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CMXT1CMV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DT72YTTB",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FB37NC1D",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DZ676F3R",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09FYCXL7R",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09Y668V46",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B083K6WMSQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09VCBKCFW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FBW4MLDJ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0B4V9DHKY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CQ2MSP2B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FCLTX5RV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DHCF13Q6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0875T785P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FJG96MSL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07L47XYSX",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07T4VRZCK",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B01HXI1OF6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B08BNQXSM1",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0G6JZ1THM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B08NG84G7P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07W6GRN1Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FB9HDNC5",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DLNXRH19",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0731H35J8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CSNJNMJY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FS1XPTCL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BZC3V6PM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F6MFNB1C",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FDZQTD73",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DBQ2SPZL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0191YRL6Q",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0C4YT9SCM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FB9B6GPS",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FX4PBX6H",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DD3WFTJN",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BJ35GBX2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FX2DJYGX",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CGD3HXXZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0D4QN5274",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CJXVR7CW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DXV4R8YP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FSRVHD6R",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0C77C3LWG",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BNPNTLQH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FY3618X7",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DZTBWB4P",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CLG95X4G",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CW1T7CHT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07GXXC451",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CTKMBR7L",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DHRHC4SQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F6CK2ZBM",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DW3V9L1T",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FNRZ4HPC",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B092V8R2RY",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0C2928RZZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0F7R5G19S",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09XHZSBBL",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CPXHFB8G",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B005LVMSS0",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FPFQ8Y98",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09BLNHS1N",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DKNFPVT9",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CZDJPN9T",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DDTDVXVW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09MDZY68V",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CFTCQLKW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09DPRV9FW",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FMFGR8GQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CP698TBT",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0CCXCLDCH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DLL262HX",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B09XDS5HBD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DSDPTR87",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DDP7HV3B",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FSZ7GM6Z",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0779BY6RQ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0FJLQWD5J",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BZC186G6",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DT6PZCBH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BHYRG6V8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B098Q7S9C2",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07F3MDC2Q",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0BY1CVFKP",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07CMKGJJH",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07G11G2X8",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B07PNNHF1T",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DT6SK85Y",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B097BYFQNV",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DPPR54CD",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    },
+    {
+      "asin": "B0DSBSTMDZ",
+      "market": "DE",
+      "domain_id": 3,
+      "source": "bestsellers",
+      "hint": "cat=430253031,range=0",
+      "score": 2
+    }
+  ]
 }

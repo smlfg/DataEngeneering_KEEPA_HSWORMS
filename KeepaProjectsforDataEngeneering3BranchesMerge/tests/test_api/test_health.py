@@ -21,7 +21,7 @@ class TestHealthEndpoints:
         assert "timestamp" in data
         assert "tokens_available" in data
         assert "watches_count" in data
-        assert data["status"] == "healthy"
+        assert data["status"] in ("healthy", "degraded")
 
     async def test_status_endpoint_returns_200(self, client):
         """GET /api/v1/status returns 200 OK"""

@@ -60,7 +60,7 @@ class TestPriceMonitorScheduler:
         assert result["watch_id"] == str(mock_watch.id)
         assert result["asin"] == mock_watch.asin
         assert result["current_price"] == 85.0
-        assert result["buy_box_seller"] == 84.99
+        assert result["buy_box_seller"] == "84.99"
         assert result["previous_price"] == 100.0
         assert result["price_changed"] is True
         assert result["alert_triggered"] is False  # 85 > 80
@@ -124,7 +124,7 @@ class TestPriceMonitorScheduler:
                 result = await scheduler.run_price_check()
 
         # Verify database update was called
-        mock_update_watch_price.assert_called_once_with(str(mock_watch.id), 75.0, 74.99)
+        mock_update_watch_price.assert_called_once_with(str(mock_watch.id), 75.0, "74.99")
         assert result["successful"] == 1
         assert result["price_changes"] == 1
 

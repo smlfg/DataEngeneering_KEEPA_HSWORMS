@@ -15,6 +15,10 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - DISCORD_WEBHOOK=${DISCORD_WEBHOOK}
+      - DEAL_SOURCE_MODE=${DEAL_SOURCE_MODE:-product_only}
+      - DEAL_SEED_FILE=${DEAL_SEED_FILE:-data/seed_asins_eu_qwertz.txt}
+      - DEAL_SCAN_INTERVAL_SECONDS=${DEAL_SCAN_INTERVAL_SECONDS:-3600}
+      - DEAL_SCAN_BATCH_SIZE=${DEAL_SCAN_BATCH_SIZE:-10}
     depends_on:
       - db
       - kafka
@@ -22,6 +26,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./prompts:/app/prompts
+      - ./data:/app/data
     restart: unless-stopped
 
   db:
@@ -105,33 +110,20 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - DISCORD_WEBHOOK=${DISCORD_WEBHOOK}
+      - DEAL_SOURCE_MODE=${DEAL_SOURCE_MODE:-product_only}
+      - DEAL_SEED_FILE=${DEAL_SEED_FILE:-data/seed_asins_eu_qwertz.txt}
+      - DEAL_SCAN_INTERVAL_SECONDS=${DEAL_SCAN_INTERVAL_SECONDS:-3600}
+      - DEAL_SCAN_BATCH_SIZE=${DEAL_SCAN_BATCH_SIZE:-10}
     depends_on:
       - db
       - kafka
       - elasticsearch
+    volumes:
+      - ./src:/app/src
+      - ./prompts:/app/prompts
+      - ./data:/app/data
     restart: unless-stopped
 
-  # Kafka Connect for Elasticsearch sink
-  kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.5.0
-    depends_on:
-      - kafka
-      - elasticsearch
-    ports:
-      - "8083:8083"
-    environment:
-      CONNECT_BOOTSTRAP_SERVERS: kafka:29092
-      CONNECT_GROUP_ID: kafka-connect
-      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
-      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
-      CONNECT_STATUS_STORAGE_TOPIC: connect-status
-      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      CONNECT_ELASTICSEARCH_URL: http://elasticsearch:9200
-      CONNECT_ELASTICSEARCH_DATABASES: keeper
-    restart: unless-stopped
 
 volumes:
   postgres_data:

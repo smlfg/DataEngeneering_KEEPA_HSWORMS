@@ -48,7 +48,7 @@ class TestDealFinderInit:
 class TestSeedSource:
     def test_get_seed_asins_uses_file_when_env_empty(self, agent, tmp_path):
         seed_file = tmp_path / "seed_asins.txt"
-        seed_file.write_text("B08N5WRWNW,B09G9FPHY6", encoding="utf-8")
+        seed_file.write_text("B08N5WRWNW\nB09G9FPHY6", encoding="utf-8")
 
         agent.settings.deal_seed_asins = ""
         agent.settings.deal_seed_file = str(seed_file)
@@ -69,12 +69,9 @@ class TestSeedSource:
 
 class TestSearchDeals:
     @pytest.mark.asyncio
-    async def test_search_deals_uses_start_offset_rotation(self, agent):
-        seeds = ["B000000001", "B000000002", "B000000003", "B000000004"]
+    async def test_search_deals_calls_deals_api_and_limits_results(self, agent):
         filter_config = {
-            "seed_asins": seeds,
             "max_asins": 2,
-            "start_offset": 3,
             "min_discount": 0,
             "max_discount": 100,
             "min_price": 0,
@@ -82,48 +79,41 @@ class TestSearchDeals:
             "min_rating": 0,
         }
 
-        async def fake_product(asin):
-            return {
-                "asin": asin,
-                "title": f"Product {asin}",
-                "current_price": 50.0,
-                "list_price": 100.0,
-                "rating": 4.2,
-                "offers_count": 30,
-            }
+        with patch("src.agents.deal_finder.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.search_deals = AsyncMock(return_value={
+                "deals": [
+                    {"asin": "B000000004", "title": "Product 4", "current_price": 50.0, "list_price": 100.0, "discount_percent": 50, "rating": 4.2, "reviews": 30},
+                    {"asin": "B000000001", "title": "Product 1", "current_price": 60.0, "list_price": 100.0, "discount_percent": 40, "rating": 4.3, "reviews": 25},
+                    {"asin": "B000000002", "title": "Product 2", "current_price": 70.0, "list_price": 100.0, "discount_percent": 30, "rating": 4.1, "reviews": 20},
+                ],
+                "total": 3,
+                "page": 0,
+                "category_names": [],
+            })
+            mock_get_client.return_value = mock_client
 
-        with patch("src.agents.deal_finder.keepa_client") as mock_client:
-            mock_client.query_product = AsyncMock(side_effect=fake_product)
-            await agent.search_deals(filter_config)
+            result = await agent.search_deals(filter_config)
 
-            called_asins = [call.args[0] for call in mock_client.query_product.await_args_list]
-            assert called_asins == ["B000000004", "B000000001"]
+            mock_client.search_deals.assert_called_once()
+            assert len(result) <= 2
 
     @pytest.mark.asyncio
     async def test_search_deals_returns_list_of_scored_deals(
         self, agent, sample_filter_config
     ):
-        with patch("src.agents.deal_finder.keepa_client") as mock_client:
-            mock_client.query_product = AsyncMock(
-                side_effect=[
-                    {
-                        "asin": "B08N5WRWNW",
-                        "title": "Product A",
-                        "current_price": 99.0,
-                        "list_price": 150.0,
-                        "rating": 4.6,
-                        "offers_count": 200,
-                    },
-                    {
-                        "asin": "B09G9FPHY6",
-                        "title": "Product B",
-                        "current_price": 120.0,
-                        "list_price": 220.0,
-                        "rating": 4.2,
-                        "offers_count": 100,
-                    },
-                ]
-            )
+        with patch("src.agents.deal_finder.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.search_deals = AsyncMock(return_value={
+                "deals": [
+                    {"asin": "B08N5WRWNW", "title": "Product A", "current_price": 99.0, "list_price": 150.0, "discount_percent": 34, "rating": 4.6, "reviews": 200},
+                    {"asin": "B09G9FPHY6", "title": "Product B", "current_price": 120.0, "list_price": 220.0, "discount_percent": 45, "rating": 4.2, "reviews": 100},
+                ],
+                "total": 2,
+                "page": 0,
+                "category_names": [],
+            })
+            mock_get_client.return_value = mock_client
 
             result = await agent.search_deals(sample_filter_config)
 
@@ -136,27 +126,34 @@ class TestSearchDeals:
     async def test_search_deals_empty_response_returns_empty_list(
         self, agent, sample_filter_config
     ):
-        with patch("src.agents.deal_finder.keepa_client") as mock_client:
-            mock_client.query_product = AsyncMock(return_value=None)
+        with patch("src.agents.deal_finder.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.search_deals = AsyncMock(return_value={
+                "deals": [],
+                "total": 0,
+                "page": 0,
+                "category_names": [],
+            })
+            mock_get_client.return_value = mock_client
 
             result = await agent.search_deals(sample_filter_config)
             assert result == []
 
     @pytest.mark.asyncio
     async def test_search_deals_handles_api_error(self, agent, sample_filter_config):
-        with patch("src.agents.deal_finder.keepa_client") as mock_client:
-            mock_client.query_product = AsyncMock(
-                side_effect=[Exception("API Error"), None]
+        with patch("src.agents.deal_finder.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.search_deals = AsyncMock(
+                side_effect=Exception("API Error")
             )
+            mock_get_client.return_value = mock_client
 
             result = await agent.search_deals(sample_filter_config)
             assert result == []
 
     @pytest.mark.asyncio
     async def test_search_deals_respects_max_per_report(self, agent):
-        asins = [f"B{i:09d}"[:10] for i in range(30)]
         filter_config = {
-            "seed_asins": asins,
             "min_discount": 0,
             "max_discount": 100,
             "min_price": 0,
@@ -164,17 +161,21 @@ class TestSearchDeals:
             "min_rating": 0,
         }
 
-        with patch("src.agents.deal_finder.keepa_client") as mock_client:
-            mock_client.query_product = AsyncMock(
-                return_value={
-                    "asin": "B08N5WRWNW",
-                    "title": "X",
-                    "current_price": 100,
-                    "list_price": 200,
-                    "rating": 4.0,
-                    "offers_count": 10,
-                }
-            )
+        deals_data = [
+            {"asin": f"B{i:09d}", "title": f"Product {i}", "current_price": 100, "list_price": 200, "discount_percent": 50, "rating": 4.0, "reviews": 10}
+            for i in range(30)
+        ]
+
+        with patch("src.agents.deal_finder.get_keepa_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.search_deals = AsyncMock(return_value={
+                "deals": deals_data,
+                "total": 30,
+                "page": 0,
+                "category_names": [],
+            })
+            mock_get_client.return_value = mock_client
+
             result = await agent.search_deals(filter_config)
 
             assert len(result) <= agent.MAX_DEALS_PER_REPORT

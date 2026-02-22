@@ -6,6 +6,7 @@ With PostgreSQL persistence, Elasticsearch search, and real-time price monitorin
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
+from sqlalchemy import select as sa_select
 
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,9 @@ from src.services.database import (
     get_user_watches,
     soft_delete_watch,
     get_active_watch_count,
+    async_session_maker,
+    PriceHistory,
+    WatchedProduct,
 )
 from src.services.keepa_api import TokenLimitError, NoDealAccessError
 from src.services.keepa_api import get_keepa_client
@@ -95,6 +99,9 @@ class HealthResponse(BaseModel):
     timestamp: str
     tokens_available: int
     watches_count: int
+    elasticsearch: str
+    database: str
+    kafka: str
 
 
 class PriceCheckRequest(BaseModel):
@@ -164,16 +171,53 @@ app.add_middleware(
 # Health & Status Endpoints
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with deep checks for ES, DB, and Kafka"""
     client = get_keepa_client()
     token_status = client.get_token_status()
     watches_count = await get_active_watch_count()
 
+    # Elasticsearch check
+    es_status = "error"
+    try:
+        if es_service.client and await es_service.client.ping():
+            es_status = "ok"
+    except Exception:
+        pass
+
+    # Database check
+    db_status = "error"
+    try:
+        from sqlalchemy import text
+        async with async_session_maker() as session:
+            await session.execute(text("SELECT 1"))
+            db_status = "ok"
+    except Exception:
+        pass
+
+    # Kafka check
+    kafka_status = "error"
+    try:
+        from aiokafka import AIOKafkaProducer
+        probe = AIOKafkaProducer(
+            bootstrap_servers=settings.kafka_bootstrap_servers,
+            request_timeout_ms=3000,
+        )
+        await probe.start()
+        await probe.stop()
+        kafka_status = "ok"
+    except Exception:
+        pass
+
+    all_ok = es_status == "ok" and db_status == "ok" and kafka_status == "ok"
+
     return {
-        "status": "healthy",
+        "status": "healthy" if all_ok else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
         "tokens_available": token_status.get("tokens_available", 0),
         "watches_count": watches_count,
+        "elasticsearch": es_status,
+        "database": db_status,
+        "kafka": kafka_status,
     }
 
 
@@ -576,6 +620,71 @@ async def index_deal_to_elasticsearch(deal: Dict[str, Any]):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error indexing deal: {str(e)}")
+
+
+# Price History Endpoints
+@app.get("/api/v1/prices/{asin}/history")
+async def get_price_history(
+    asin: str,
+    days: int = Query(
+        default=30, ge=1, le=365, description="Number of days to look back"
+    ),
+):
+    """Get price history for an ASIN from deal snapshots."""
+    from datetime import timedelta
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            sa_select(PriceHistory, WatchedProduct)
+            .join(WatchedProduct, PriceHistory.watch_id == WatchedProduct.id)
+            .where(
+                WatchedProduct.asin == asin,
+                PriceHistory.recorded_at >= cutoff,
+            )
+            .order_by(PriceHistory.recorded_at)
+        )
+        rows = result.all()
+
+    if not rows:
+        return {"asin": asin, "history": [], "count": 0}
+
+    history = [
+        {
+            "price": ph.price,
+            "recorded_at": ph.recorded_at.isoformat() if ph.recorded_at else None,
+            "source": ph.buy_box_seller,
+        }
+        for ph, wp in rows
+    ]
+
+    return {
+        "asin": asin,
+        "history": history,
+        "count": len(history),
+        "period_days": days,
+    }
+
+
+@app.get("/api/v1/prices/{asin}/stats")
+async def get_price_stats(asin: str):
+    """Get price statistics for an ASIN from Elasticsearch deal data."""
+    try:
+        stats = await es_service.get_deal_price_stats(asin)
+        if not stats or stats.get("data_points", 0) == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No price data found for ASIN {asin}",
+            )
+        return {"asin": asin, **stats}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting price stats: {str(e)}",
+        )
 
 
 # Rate Limit Endpoints
