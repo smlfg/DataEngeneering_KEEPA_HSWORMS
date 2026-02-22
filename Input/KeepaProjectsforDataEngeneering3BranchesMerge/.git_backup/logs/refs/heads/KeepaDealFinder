@@ -1,2 +1,0 @@
-0000000000000000000000000000000000000000 70eaa08fef57f5999968093a65108a4fd2c2396e Samuel Fleig <smlflg@gmail.com> 1770287210 +0100	clone: from https://github.com/smlfg/KeepaProjectsforDataEngeneering3BranchesMerge
-70eaa08fef57f5999968093a65108a4fd2c2396e 011e5b0a562fedf3b8239ed26d47aea136062aea Samuel Fleig <smlflg@gmail.com> 1771532269 +0100	commit: feat: Kafka integration + ES Pipeline/Template/Alias + 3-Node cluster demo

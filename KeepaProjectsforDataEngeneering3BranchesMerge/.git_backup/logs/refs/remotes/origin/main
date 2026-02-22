@@ -1,3 +1,0 @@
-0000000000000000000000000000000000000000 07bec0c16b2a44f291eb6f5ee03072d04fff5b68 Samuel Fleig <smlflg@gmail.com> 1771540196 +0100	fetch newrepo main: storing head
-07bec0c16b2a44f291eb6f5ee03072d04fff5b68 30a20f56bf971ec09334e5c83dc8f373440e44d7 Samuel Fleig <smlflg@gmail.com> 1771540214 +0100	update by push
-30a20f56bf971ec09334e5c83dc8f373440e44d7 30a20f56bf971ec09334e5c83dc8f373440e44d7 smlflg <smlflg@pop-os.(none)> 1771540244 +0100	remote: renamed refs/remotes/newrepo/main to refs/remotes/origin/main
