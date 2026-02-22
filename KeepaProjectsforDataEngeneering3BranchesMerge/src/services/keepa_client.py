@@ -184,7 +184,7 @@ class KeepaClient:
         params = {
             "key": self.api_key,
             "domain": domain_id,
-            "type": 0,
+            "type": "product",
             "term": search_term,
             "page": page,
         }

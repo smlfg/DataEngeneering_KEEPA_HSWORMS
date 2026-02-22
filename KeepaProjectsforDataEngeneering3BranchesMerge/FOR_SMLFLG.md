@@ -110,7 +110,7 @@ Keepa is to Amazon prices what Bloomberg is to stock prices. It tracks every pri
 ### Docker Stack (after stabilization)
 
 ```yaml
-# 7 containers, all restart: unless-stopped
+# 7 long-running containers + 1 init container
 app          -> FastAPI (port 8000)
 scheduler    -> Background price checks + deal collector
 db           -> PostgreSQL 15 (port 5432)
@@ -118,6 +118,7 @@ zookeeper    -> Kafka coordination (port 2181)
 kafka        -> Event streaming (port 9092)
 elasticsearch -> Search + analytics (port 9200)
 kibana       -> Dashboard (port 5601)
+kibana-setup -> One-shot: imports dashboards, then exits (added 2026-02-22)
 
 # REMOVED on 2026-02-20: kafka-connect (was in restart loop, unused)
 ```
@@ -216,7 +217,10 @@ KeepaProjectsforDataEngeneering3BranchesMerge/     (83 files, 19 directories)
 │   ├── test_services/                     # Service layer tests (3 files)
 │   ├── test_config.py, test_scheduler.py
 │   └── conftest.py                        # Fixtures
-├── docker-compose.yml                     # 7-container stack definition
+├── kibana/                                # Kibana auto-load dashboards
+│   ├── setup-kibana.sh                    # Init script (wait + import)
+│   └── saved_objects.ndjson               # 14 saved objects (data views + dashboards)
+├── docker-compose.yml                     # 7+1 container stack definition
 ├── Dockerfile                             # Python 3.11-slim image
 ├── requirements.txt                       # Python dependencies
 └── FOR_SMLFLG.md                          # <-- You are here
@@ -611,7 +615,7 @@ Not the mason -- the site manager.
 |----------|--------|-----|-------------|
 | Core Pipeline | 7/10 | 9/10 | Kafka + ES fully integrated, deal collector runs continuously |
 | Code Quality | 4/10 | 7/10 | Structured logging, type-safe configs, cleaned imports |
-| Tests | 3/10 | 9/10 | 262/262 passing, API + agent + service tests (22.02.2026) |
+| Tests | 3/10 | 9/10 | 266/266 passing, API + agent + service tests (22.02.2026) |
 | Deployment | 7/10 | 9/10 | Stable 7-container stack, systemd services, nightwatch |
 | Monitoring | 0/10 | 8/10 | 11 nightwatch scripts, morning reports, pipeline logging |
 | Documentation | 5/10 | 8/10 | Architecture docs, exam prep, this file |
@@ -876,7 +880,7 @@ Basierend auf der Exploration durch 3 parallele Agents (Struktur, Pipeline, Dock
 | Elasticsearch | READY | 2 Indices, German Stemming, Aggregationen |
 | Keepa Integration | READY | Token Bucket, CSV-Parsing, Fallback-Strategie |
 | Docker Stack | READY | 7 Container, Dependencies, Volume Persistence |
-| Tests | READY | 262 passed, 0 failed (Stand: 22.02.2026) |
+| Tests | READY | 266 passed, 0 failed (Stand: 22.02.2026) |
 | Monitoring | READY | 11 Nightwatch Scripts, Structured Logging |
 
 **Blocking Issues: KEINE.**
@@ -1131,6 +1135,72 @@ xdg-open http://localhost:5601
 # 6. Tests laufen lassen
 ../.venv/bin/python -m pytest --no-cov -q
 ```
+
+---
+
+## 17. KIBANA AUTO-LOAD DASHBOARDS (22.02.2026)
+
+### Was es macht
+
+Beim `docker-compose up -d` startet ein einmaliger Init-Container (`kibana-setup`), der:
+1. Wartet bis Kibana HTTP 200 zurueckgibt (max 5 Minuten)
+2. Importiert 2 Data Views + 10 Visualisierungen + 2 Dashboards via Saved Objects API
+3. Beendet sich mit Exit 0
+
+**Ergebnis:** Kibana oeffnen → Dashboard-Tab → 2 fertige Dashboards sofort verfuegbar. Zero manual setup.
+
+### Dashboard 1: "Deal Overview" (Index: `keeper-deals`)
+
+| Panel | Typ | Zeigt |
+|-------|-----|-------|
+| Total Deals | Metric | Anzahl aller Deals |
+| Avg Discount % | Metric | Durchschnittlicher Rabatt |
+| Deals by Domain | Pie Chart | Verteilung nach Amazon-Marktplatz |
+| Discount Distribution | Bar Chart | Histogramm der Rabatt-Bereiche (0-10%, 10-20%, ...) |
+| Deals over Time | Line Chart | Deals pro Tag (date_histogram) |
+| Latest 20 Deals | Data Table | title, current_price, discount_percent, domain, deal_score |
+
+### Dashboard 2: "Price Monitor" (Index: `keeper-prices`)
+
+| Panel | Typ | Zeigt |
+|-------|-----|-------|
+| Total Price Events | Metric | Anzahl aller Preis-Events |
+| Price Trend | Line Chart | Durchschnittspreis ueber Zeit |
+| Events by Domain | Pie Chart | Verteilung nach Marktplatz |
+| Latest 20 Price Changes | Data Table | asin, product_title, current_price, price_change_percent, domain |
+
+### Technische Details
+
+```
+kibana/
+├── setup-kibana.sh          # Wartet auf Kibana, importiert NDJSON
+└── saved_objects.ndjson     # 14 Saved Objects (2 Data Views + 10 Lens + 2 Dashboards)
+
+docker-compose.yml
+└── kibana-setup             # curlimages/curl:8.5.0, einmal-Job, restart: "no"
+```
+
+### Verifikation
+
+```bash
+# 1. Logs pruefen (sollte "Dashboards imported successfully!" zeigen)
+docker-compose logs kibana-setup
+
+# 2. Container-Status (sollte "Exited (0)" sein)
+docker-compose ps kibana-setup
+
+# 3. Data Views pruefen
+curl -s http://localhost:5601/api/data_views | python3 -m json.tool
+
+# 4. Kibana oeffnen → Dashboard-Tab
+xdg-open http://localhost:5601/app/dashboards
+```
+
+### Hinweise
+
+- Dashboards sind beim ersten Start **leer** (keine Daten). Nach dem ersten Scheduler-Run erscheinen Daten.
+- Bei erneutem Import (`docker-compose restart kibana-setup`) werden bestehende Objekte ueberschrieben (`overwrite=true`).
+- Der `kibana-setup` Container bleibt nach Exit sichtbar in `docker-compose ps` — das ist normal fuer Einmal-Jobs.
 
 ---
 

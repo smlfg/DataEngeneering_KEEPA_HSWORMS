@@ -351,26 +351,104 @@ class KeepaAPIClient:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(self._executor, lambda: func(*args, **kwargs))
 
+    async def _api_call_with_retry(self, func, max_retries: int = 3, timeout: float = 60.0):
+        """Execute an API call with retry logic and timeout.
+
+        Retries on server errors (500/502/503) and connection errors with
+        exponential backoff (2s, 4s, 8s).  Non-retryable errors are raised
+        immediately.
+
+        Args:
+            func: Callable that performs the synchronous API call
+            max_retries: Maximum number of attempts
+            timeout: Per-attempt timeout in seconds
+        """
+        last_exception: Exception | None = None
+
+        for attempt in range(max_retries):
+            try:
+                return await asyncio.wait_for(
+                    self._sync_call(func),
+                    timeout=timeout,
+                )
+            except asyncio.TimeoutError:
+                last_exception = KeepaAPIError(
+                    f"API call timed out after {timeout}s "
+                    f"(attempt {attempt + 1}/{max_retries})"
+                )
+                logger.warning(
+                    f"⏰ API timeout (attempt {attempt + 1}/{max_retries})"
+                )
+            except Exception as e:
+                error_msg = str(e).upper()
+                # Retry on server errors (500, 502, 503)
+                retryable_codes = ("500", "502", "503", "SERVER ERROR",
+                                   "BAD GATEWAY", "SERVICE UNAVAILABLE")
+                # Retry on connection / network errors
+                retryable_net = ("CONNECTION", "CONNECT", "DNS", "NETWORK",
+                                 "TIMEOUT", "TIMED OUT")
+
+                if any(code in error_msg for code in retryable_codes):
+                    last_exception = e
+                    logger.warning(
+                        f"🔄 Server error (attempt {attempt + 1}/{max_retries}): {e}"
+                    )
+                elif any(term in error_msg for term in retryable_net):
+                    last_exception = e
+                    logger.warning(
+                        f"🔄 Connection error (attempt {attempt + 1}/{max_retries}): {e}"
+                    )
+                else:
+                    # Non-retryable error — raise immediately
+                    raise
+
+            if attempt < max_retries - 1:
+                wait_time = 2 ** (attempt + 1)  # 2s, 4s, 8s
+                logger.info(f"⏳ Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+
+        raise KeepaAPIError(
+            f"API call failed after {max_retries} retries: {last_exception}"
+        )
+
     async def update_token_status(self):
-        """Update token bucket from Keepa API status"""
+        """Update token bucket from Keepa API status.
+
+        The keepa library sets ``self._api.status`` as a ``Status`` dataclass
+        (with attributes ``tokensLeft``, ``refillIn``, ``refillRate``),
+        **not** a plain dict.  We support both formats so that unit-tests
+        using dict mocks keep working.
+        """
         try:
-            # self._api.status is a dict property set after each API call, NOT a method
             status = self._api.status if self._api else None
-            if status and isinstance(status, dict):
+            if not status:
+                return
+
+            # Handle both dict (legacy/mocks) and Status dataclass (real keepa lib)
+            if isinstance(status, dict):
                 tokens_per_min = status.get("tokensPerMin", 20) or 20
                 refill_in = status.get("refillIn", 60) or 60
+            elif hasattr(status, "refillRate"):
+                # Status dataclass: tokensLeft, refillIn, refillRate, timestamp
+                tokens_per_min = status.refillRate or 20
+                refill_in = status.refillIn or 60
+                # Keepa API returns refillIn in milliseconds — convert to seconds
+                if refill_in > 1000:
+                    refill_in = refill_in / 1000.0
+            else:
+                return
 
-                self._token_bucket.tokens_per_minute = tokens_per_min
-                self._token_bucket.refill_interval = refill_in
+            self._token_bucket.tokens_per_minute = int(tokens_per_min)
+            self._token_bucket.refill_interval = int(refill_in)
 
-                # Sync available tokens from real Keepa state
-                tokens_left = self._get_tokens_left()
-                if tokens_left is not None:
-                    self._token_bucket.tokens_available = tokens_left
+            # Sync available tokens from real Keepa state
+            tokens_left = self._get_tokens_left()
+            if tokens_left is not None:
+                self._token_bucket.tokens_available = tokens_left
 
-                logger.debug(
-                    f"🔄 Token status updated: {tokens_left}/{tokens_per_min} tokens"
-                )
+            logger.debug(
+                f"🔄 Token status updated: {tokens_left}/{tokens_per_min} tokens"
+            )
         except Exception as e:
             logger.warning(f"⚠️ Could not update token status: {e}")
 
@@ -418,9 +496,9 @@ class KeepaAPIClient:
         logger.info(f"Total tokens consumed this session: {self.total_tokens_consumed}")
 
         try:
-            # Make API call
+            # Make API call (with retry + 60s timeout)
             _t0 = time.time()
-            products = await self._sync_call(
+            products = await self._api_call_with_retry(
                 lambda: self._api.query(asin, domain=domain, stats=90, history=True, offers=20)
             )
             _elapsed_ms = (time.time() - _t0) * 1000
@@ -651,8 +729,8 @@ class KeepaAPIClient:
             if filters.price_types:
                 deal_params["priceTypes"] = filters.price_types
 
-            # Call deals API
-            result = await self._sync_call(
+            # Call deals API (with retry + 60s timeout)
+            result = await self._api_call_with_retry(
                 lambda: self._api.deals(
                     deal_params, domain=self.DOMAIN_MAP.get(filters.domain_id, "DE")
                 )
@@ -766,7 +844,7 @@ class KeepaAPIClient:
         logger.info(f"Total tokens consumed this session: {self.total_tokens_consumed}")
 
         try:
-            products = await self._sync_call(
+            products = await self._api_call_with_retry(
                 lambda: self._api.query(asin, domain=self.DOMAIN_MAP[3])
             )
 

@@ -5,3 +5,10 @@ __pycache__/
 .git_backup/
 reports/
 *.log
+*.backup-*
+
+# Generated scraper/API outputs (keep seed files, ignore generated data)
+**/data/amazon_asins_raw.*
+**/data/keepa_search_*
+**/data/orchestrator_log.txt
+**/data/scraper_log.txt

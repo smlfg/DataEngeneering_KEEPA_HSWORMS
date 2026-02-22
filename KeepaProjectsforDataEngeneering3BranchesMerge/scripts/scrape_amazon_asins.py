@@ -33,9 +33,14 @@ from collections import defaultdict
 from playwright.async_api import async_playwright
 
 try:
-    from playwright_stealth import stealth_async
+    from playwright_stealth import Stealth
 
+    _stealth_instance = Stealth()
     STEALTH_AVAILABLE = True
+
+    async def stealth_async(page):
+        """Adapter for playwright-stealth v2 API."""
+        await _stealth_instance.apply_stealth_async(page)
 except ImportError:
     STEALTH_AVAILABLE = False
     print("WARNING: playwright-stealth not installed. Running without stealth.")

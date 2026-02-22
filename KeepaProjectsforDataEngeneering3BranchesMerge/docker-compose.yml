@@ -97,6 +97,15 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     restart: unless-stopped
 
+  kibana-setup:
+    image: curlimages/curl:8.5.0
+    depends_on:
+      - kibana
+    volumes:
+      - ./kibana:/setup:ro
+    entrypoint: ["/bin/sh", "/setup/setup-kibana.sh"]
+    restart: "no"
+
   scheduler:
     build: .
     command: python -m src.scheduler
