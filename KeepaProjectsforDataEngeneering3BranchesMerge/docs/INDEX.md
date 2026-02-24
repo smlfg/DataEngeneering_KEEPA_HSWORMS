@@ -6,7 +6,8 @@
 |----------|-------------|---------------|
 | [KEEPA_API.md](KEEPA_API.md) | Keepa API | Endpoints, CSV-Format, Token Bucket, Domain-IDs, Preis-Parsing |
 | [KEEPA_API_LEARNINGS.md](KEEPA_API_LEARNINGS.md) | Keepa API Praxis | Was funktioniert, was nicht, Fact-Check, Batch-Optimierung, Lessons Learned |
-| [ELASTICSEARCH.md](ELASTICSEARCH.md) | Elasticsearch 8.11 | Indices, Mappings, Queries, Aggregationen, Kibana |
+| [ELASTICSEARCH.md](ELASTICSEARCH.md) | Elasticsearch 8.11 | Indices, Mappings, Queries, Aggregationen |
+| [KIBANA.md](KIBANA.md) | Kibana 8.11 | Discover, KQL, Dashboards, Dev Tools, Saved Searches |
 | [DOCKER.md](DOCKER.md) | Docker Compose | Alle 8 Services, Ports, Volumes, Startup-Reihenfolge |
 | [KAFKA.md](KAFKA.md) | Apache Kafka | Topics, Producer/Consumer, Message-Formate, Consumer Groups |
 | [POSTGRESQL.md](POSTGRESQL.md) | PostgreSQL 15 | Schema, Tabellen, SQLAlchemy Models, nuetzliche Queries |
@@ -18,7 +19,7 @@
 |----------|--------|
 | [PIPELINE_FLOW.md](PIPELINE_FLOW.md) | **Schritt-fuer-Schritt:** Wie ein Deal von Keepa bis ES fliesst (mit Code-Referenzen) |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Architektur-Entscheidungen, Datenfluss-Diagramme |
-| [CODE_REVIEW.md](CODE_REVIEW.md) | Code-Qualitaet, Review-Ergebnisse |
+| [OVER_ENGINEERING_AUDIT.md](OVER_ENGINEERING_AUDIT.md) | Ehrliche Selbstreflexion: Was over-engineered ist, was nicht, und warum das okay ist |
 | [project-deep-dive.md](project-deep-dive.md) | Technischer Deep-Dive |
 
 ## Lernen & Vorbereitung
@@ -66,3 +67,15 @@ Keepa API ──→ Scheduler ──→ Kafka Producer ──→ Kafka Topics
                     FastAPI ←───┘
                     [FASTAPI]
 ```
+
+---
+
+## Archiv
+
+Historische / nicht pruefungsrelevante Docs und Scripts wurden in Archive-Ordner verschoben,
+um den ersten Eindruck sauber zu halten. Nichts geloescht — alles via `git` reversibel.
+
+| Ordner | Inhalt |
+|--------|--------|
+| `docs/archive/` | ClaudeChromeExtension.md, CODE_REVIEW.md, todoDB.md, SWARM_REPORT_PRUEFUNG.md |
+| `scripts/archive/` | Einmal-Scripts fuer Seed-Daten (collect_1000_keyboards, scrape_amazon_asins, discover_*) |
