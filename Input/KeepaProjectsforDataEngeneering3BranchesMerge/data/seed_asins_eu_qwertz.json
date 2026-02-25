@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "generated_at": "2026-02-21T22:10:38.778931+00:00",
+    "generated_at": "2026-02-25T13:50:47.273863+00:00",
     "domains": [
       "UK",
       "FR",
@@ -25,7 +25,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:05.756610+00:00"
+        "validated_at": "2026-02-25T13:50:07.580279+00:00"
       },
       {
         "asin": "B014EUQOGK",
@@ -41,7 +41,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:05.756649+00:00"
+        "validated_at": "2026-02-25T13:50:07.580313+00:00"
       },
       {
         "asin": "B01NABDNPH",
@@ -57,7 +57,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:07.389430+00:00"
+        "validated_at": "2026-02-25T13:50:09.673229+00:00"
       },
       {
         "asin": "B01E8KO2B0",
@@ -73,7 +73,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:12.650622+00:00"
+        "validated_at": "2026-02-25T13:50:16.655305+00:00"
       }
     ],
     "FR": [
@@ -83,15 +83,15 @@
         "domain": "FR",
         "domain_id": 4,
         "amazon_price": null,
-        "new_price": 91.0,
+        "new_price": 112.38,
         "used_price": null,
         "whd_price": null,
-        "list_price": 91.0,
+        "list_price": 112.38,
         "deal_price": null,
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:13.562862+00:00"
+        "validated_at": "2026-02-25T13:50:17.853049+00:00"
       },
       {
         "asin": "B01NABDNPH",
@@ -107,7 +107,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:15.687942+00:00"
+        "validated_at": "2026-02-25T13:50:19.816101+00:00"
       }
     ],
     "IT": [
@@ -117,15 +117,15 @@
         "domain": "IT",
         "domain_id": 8,
         "amazon_price": null,
-        "new_price": 90.39,
+        "new_price": 109.24,
         "used_price": 45.83,
         "whd_price": null,
-        "list_price": 90.39,
+        "list_price": 109.24,
         "deal_price": 45.83,
-        "discount_percent": 49.3,
+        "discount_percent": 58.0,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:23.041686+00:00"
+        "validated_at": "2026-02-25T13:50:27.277352+00:00"
       },
       {
         "asin": "B01NABDNPH",
@@ -141,7 +141,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:24.699112+00:00"
+        "validated_at": "2026-02-25T13:50:29.525268+00:00"
       },
       {
         "asin": "B01E8KO2B0",
@@ -157,7 +157,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:29.881419+00:00"
+        "validated_at": "2026-02-25T13:50:36.342882+00:00"
       }
     ],
     "ES": [
@@ -175,7 +175,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:30.919820+00:00"
+        "validated_at": "2026-02-25T13:50:38.669520+00:00"
       },
       {
         "asin": "B014EUQOGK",
@@ -191,7 +191,7 @@
         "discount_percent": 29.5,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:30.919863+00:00"
+        "validated_at": "2026-02-25T13:50:38.669565+00:00"
       },
       {
         "asin": "B01NABDNPH",
@@ -207,7 +207,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:32.886865+00:00"
+        "validated_at": "2026-02-25T13:50:40.827872+00:00"
       },
       {
         "asin": "B01E8KO2B0",
@@ -223,7 +223,7 @@
         "discount_percent": null,
         "rating": null,
         "reviews": 0,
-        "validated_at": "2026-02-21T22:10:38.777767+00:00"
+        "validated_at": "2026-02-25T13:50:47.272438+00:00"
       }
     ]
   },

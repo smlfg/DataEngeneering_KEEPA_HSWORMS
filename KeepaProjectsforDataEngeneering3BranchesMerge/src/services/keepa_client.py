@@ -3,6 +3,7 @@ Keepa API Client
 Handles all interactions with Keepa API
 """
 
+import asyncio
 import hashlib
 import logging
 import time
@@ -108,19 +109,67 @@ class KeepaClient:
         self.api_key_hash = self._hash_api_key(self.api_key)
         self.rate_limit_remaining: int = 100
         self.rate_limit_reset: Optional[int] = None
+        self._es_service = None
 
     def _hash_api_key(self, key: str) -> str:
         """Hash API key for logging (security)"""
         return hashlib.sha256(key.encode()).hexdigest()[:16]
 
+    def _get_es_service(self):
+        """Lazy-load ES service to avoid circular imports."""
+        if self._es_service is None:
+            try:
+                from src.services.elasticsearch_service import es_service
+                self._es_service = es_service
+            except Exception:
+                pass
+        return self._es_service
+
+    async def _log_token_metric(self, response: dict, endpoint: str,
+                                 response_time_ms: int, domain: str = "",
+                                 asin_count: int = 0, success: bool = True,
+                                 error: str = ""):
+        """Write token metric to ES after each API call."""
+        es = self._get_es_service()
+        if not es:
+            return
+        metric = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "operation": endpoint,
+            "tokens_consumed": response.get("tokensConsumed", 0),
+            "tokens_left": response.get("tokensLeft", self.rate_limit_remaining),
+            "refill_rate": response.get("refillRate", 0),
+            "refill_in": response.get("refillIn", 0),
+            "response_time_ms": response_time_ms,
+            "asin_count": asin_count,
+            "domain": domain,
+            "success": success,
+            "error": error,
+        }
+        try:
+            await es.index_token_metric(metric)
+        except Exception:
+            pass
+
     async def _make_request(
         self, endpoint: str, params: dict, timeout: float = 30.0, method: str = "GET"
     ) -> dict:
         """
-        Make API request with retry logic
+        Make API request with token-aware rate limiting.
+        Waits for token refill when budget is low before sending request.
         Uses query parameter authentication (key=...)
         """
         url = f"{KEEPA_API_BASE}/{endpoint}"
+
+        # Token-aware pre-check: wait if tokens are low
+        if self.rate_limit_remaining < 10 and self.rate_limit_reset:
+            wait_ms = max(self.rate_limit_reset, 1000)
+            wait_s = min(wait_ms / 1000, 60)  # Cap at 60s
+            logger.info(
+                f"Token budget low ({self.rate_limit_remaining}), "
+                f"waiting {wait_s:.0f}s for refill..."
+            )
+            await asyncio.sleep(wait_s)
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             if method == "POST":
@@ -141,7 +190,14 @@ class KeepaClient:
                 raise KeepaAuthError("Invalid Keepa API key")
 
             elif response.status_code == 429:
-                raise KeepaRateLimitError("Keepa API rate limit exceeded")
+                # Read reset time from response and update state
+                reset_ms = int(response.headers.get("X-RateLimit-Reset", 15000))
+                self.rate_limit_remaining = 0
+                self.rate_limit_reset = reset_ms
+                raise KeepaRateLimitError(
+                    f"Rate limit exceeded. Reset in {reset_ms}ms. "
+                    f"Remaining: {self.rate_limit_remaining}"
+                )
 
             elif response.status_code == 404:
                 raise NoDealAccessError(
@@ -158,8 +214,8 @@ class KeepaClient:
                 )
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=30, max=120),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=15, max=90),
         retry=retry_if_exception_type((KeepaRateLimitError, KeepaTimeoutError)),
     )
     async def search_products(
@@ -199,6 +255,8 @@ class KeepaClient:
 
             execution_time = int((time.time() - start_time) * 1000)
 
+            await self._log_token_metric(response, "search", execution_time)
+
             return {
                 "raw": response,
                 "metadata": {
@@ -218,8 +276,8 @@ class KeepaClient:
             raise KeepaApiError(f"Search failed: {str(e)}")
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=30, max=120),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=15, max=90),
         retry=retry_if_exception_type((KeepaRateLimitError, KeepaTimeoutError)),
     )
     async def get_products(
@@ -238,6 +296,7 @@ class KeepaClient:
             Parsed product response
         """
         params = {"key": self.api_key, "domain": domain_id, "asin": ",".join(asins)}
+        domain_names = {1: "US", 2: "UK", 3: "DE", 4: "FR", 8: "IT", 9: "ES", 14: "NL"}
 
         start_time = time.time()
 
@@ -245,6 +304,12 @@ class KeepaClient:
             response = await self._make_request("product", params)
 
             execution_time = int((time.time() - start_time) * 1000)
+
+            await self._log_token_metric(
+                response, "query", execution_time,
+                domain=domain_names.get(domain_id, str(domain_id)),
+                asin_count=len(asins),
+            )
 
             return {
                 "raw": response,
@@ -262,6 +327,154 @@ class KeepaClient:
 
         except KeepaApiError as e:
             raise KeepaApiError(f"Product fetch failed: {str(e)}")
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=15, max=90),
+        retry=retry_if_exception_type((KeepaRateLimitError, KeepaTimeoutError)),
+    )
+    async def get_bestsellers(
+        self,
+        domain_id: int,
+        category: int,
+    ) -> dict:
+        """
+        Get bestseller ASINs for a category.
+
+        Args:
+            domain_id: Amazon domain (1=com, 2=uk, 3=de, 4=fr, 8=it, 9=es)
+            category: Category browse node ID
+
+        Returns:
+            Dict with raw response and metadata including asin_count
+        """
+        params = {
+            "key": self.api_key,
+            "domain": domain_id,
+            "category": category,
+        }
+
+        start_time = time.time()
+
+        domain_names = {1: "US", 2: "UK", 3: "DE", 4: "FR", 8: "IT", 9: "ES", 14: "NL"}
+
+        try:
+            response = await self._make_request("bestsellers", params)
+            execution_time = int((time.time() - start_time) * 1000)
+
+            asin_list = response.get("bestSellersList") or []
+
+            await self._log_token_metric(
+                response, "bestsellers", execution_time,
+                domain=domain_names.get(domain_id, str(domain_id)),
+                asin_count=len(asin_list),
+            )
+
+            return {
+                "raw": response,
+                "metadata": {
+                    "request_id": str(uuid4()),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "execution_time_ms": execution_time,
+                    "tokens_consumed": response.get("tokensConsumed", 0),
+                    "asin_count": len(asin_list),
+                },
+            }
+
+        except (KeepaRateLimitError, KeepaTimeoutError):
+            raise
+        except KeepaApiError as e:
+            raise KeepaApiError(f"Bestsellers fetch failed: {str(e)}")
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=15, max=90),
+        retry=retry_if_exception_type((KeepaRateLimitError, KeepaTimeoutError)),
+    )
+    async def search_categories(
+        self,
+        term: str,
+        domain_id: int,
+    ) -> dict:
+        """
+        Search for category browse node IDs by name.
+
+        Args:
+            term: Search term (e.g. "keyboard")
+            domain_id: Amazon domain
+
+        Returns:
+            Raw response with category matches
+        """
+        params = {
+            "key": self.api_key,
+            "domain": domain_id,
+            "term": term,
+            "type": "category",
+        }
+
+        response = await self._make_request("search", params)
+        return response
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=15, max=90),
+        retry=retry_if_exception_type((KeepaRateLimitError, KeepaTimeoutError)),
+    )
+    async def product_finder(
+        self,
+        domain_id: int,
+        product_parms: dict,
+    ) -> dict:
+        """
+        Find products matching filter criteria via Keepa Product Finder.
+
+        Args:
+            domain_id: Amazon domain
+            product_parms: Filter criteria dict (productType, rootCategory, salesRankRange, etc.)
+
+        Returns:
+            Dict with raw response and metadata including asin_count
+        """
+        import json as _json
+
+        params = {
+            "key": self.api_key,
+            "domain": domain_id,
+            "selection": _json.dumps(product_parms),
+        }
+
+        start_time = time.time()
+
+        domain_names = {1: "US", 2: "UK", 3: "DE", 4: "FR", 8: "IT", 9: "ES", 14: "NL"}
+
+        try:
+            response = await self._make_request("query", params, method="POST")
+            execution_time = int((time.time() - start_time) * 1000)
+
+            asin_list = response.get("asinList") or []
+
+            await self._log_token_metric(
+                response, "product_finder", execution_time,
+                domain=domain_names.get(domain_id, str(domain_id)),
+                asin_count=len(asin_list),
+            )
+
+            return {
+                "raw": response,
+                "metadata": {
+                    "request_id": str(uuid4()),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "execution_time_ms": execution_time,
+                    "tokens_consumed": response.get("tokensConsumed", 0),
+                    "asin_count": len(asin_list),
+                },
+            }
+
+        except (KeepaRateLimitError, KeepaTimeoutError):
+            raise
+        except KeepaApiError as e:
+            raise KeepaApiError(f"Product finder failed: {str(e)}")
 
     async def get_deals(
         self,
@@ -296,11 +509,16 @@ class KeepaClient:
         if price_types:
             params["priceTypes"] = ",".join(str(p) for p in price_types)
 
+        start_time = time.time()
         try:
             response = await self._make_request("deals", params)
+            execution_time = int((time.time() - start_time) * 1000)
             domain_name = domain_names.get(domain_id, str(domain_id))
             tokens = response.get("tokensConsumed", 0)
             logger.debug(f"Keepa API tokens consumed for {domain_name}: {tokens}")
+            await self._log_token_metric(
+                response, "deals", execution_time, domain=domain_name,
+            )
             items = (
                 response if isinstance(response, list) else response.get("deals", [])
             )
@@ -395,6 +613,10 @@ class KeepaClient:
 
             logger.debug(
                 f"Keepa /product {domain_name}: {len(asins)} ASINs, {tokens} tokens"
+            )
+            await self._log_token_metric(
+                response, "query", response_time_ms,
+                domain=domain_name, asin_count=len(asins),
             )
 
             products = response.get("products", [])

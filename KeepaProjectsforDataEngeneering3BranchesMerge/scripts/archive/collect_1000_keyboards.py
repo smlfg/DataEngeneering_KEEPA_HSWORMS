@@ -356,12 +356,11 @@ def merge_sources(data_dir: Path) -> dict[str, dict]:
 async def validate_asins(
     client: KeepaClient, merged: dict[str, dict], target_domains: list[str]
 ) -> dict[str, dict]:
-    """Batch-validate ASINs via Keepa /product for each target domain.
-    Uses adaptive batch-steering based on client.rate_limit_remaining."""
+    """Batch-validate ASINs via Keepa /product for each target domain."""
     log.info("Phase 3b: Keepa /product batch validation...")
 
     all_asins = list(merged.keys())
-    batch_size = 20  # Was 50 → conservative to avoid 429 avalanche
+    batch_size = 50
 
     for market in target_domains:
         domain_id = DOMAINS.get(market)
@@ -372,14 +371,6 @@ async def validate_asins(
 
         for i in range(0, len(all_asins), batch_size):
             batch = all_asins[i : i + batch_size]
-
-            # Token-budget pre-check: pause if tokens are low
-            remaining = getattr(client, 'rate_limit_remaining', 100)
-            if remaining < 20:
-                reset_ms = getattr(client, 'rate_limit_reset', 15000)
-                wait_s = min(max(reset_ms / 1000, 5), 60)
-                log.info(f"    Pausing {wait_s:.0f}s — tokens low ({remaining})")
-                await asyncio.sleep(wait_s)
 
             try:
                 response = await client.get_products(batch, domain_id)
@@ -461,26 +452,14 @@ async def validate_asins(
             except Exception as e:
                 log.warning(f"  Batch validation error on {market}: {e}")
                 stats["errors"] += 1
-                # On rate limit: extra pause instead of blindly continuing
-                if "rate limit" in str(e).lower():
-                    log.info("    Rate limited — extra 30s pause")
-                    await asyncio.sleep(30)
-
-            # Adaptive sleep based on token budget
-            remaining = getattr(client, 'rate_limit_remaining', 100)
-            if remaining > 50:
-                await asyncio.sleep(2)
-            elif remaining > 20:
-                await asyncio.sleep(5)
-            else:
-                await asyncio.sleep(15)
 
             progress = min(i + batch_size, len(all_asins))
             log.info(
-                f"    {market}: {progress}/{len(all_asins)} | tokens_left={remaining}"
+                f"    {market}: {progress}/{len(all_asins)} validated"
             )
+            await asyncio.sleep(2)
 
-        await asyncio.sleep(5)  # Was 3 → more breathing room between domains
+        await asyncio.sleep(3)
 
     return merged
 
@@ -751,31 +730,6 @@ def _parse_float(val) -> float | None:
 # ===== Main =====
 
 
-async def check_token_budget(client: KeepaClient) -> int:
-    """Check available Keepa API tokens before starting validation."""
-    try:
-        import httpx as _httpx
-        async with _httpx.AsyncClient(timeout=10) as http:
-            resp = await http.get(
-                f"https://api.keepa.com/token?key={client.api_key}"
-            )
-            data = resp.json()
-            tokens = data.get("tokensLeft", 0)
-            refill = data.get("refillRate", 0)
-            refill_in = data.get("refillIn", 0)
-            log.info(f"  Token budget: {tokens} left, refill {refill}/min, next in {refill_in}ms")
-
-            if tokens < 50:
-                wait_s = min(refill_in / 1000, 120) if refill_in > 0 else 60
-                log.warning(f"  Low tokens ({tokens}) — waiting {wait_s:.0f}s for refill")
-                await asyncio.sleep(wait_s)
-
-            return tokens
-    except Exception as e:
-        log.warning(f"  Token check failed: {e} — proceeding anyway")
-        return -1
-
-
 async def run(args):
     data_dir = PROJECT_ROOT / "data"
 
@@ -796,10 +750,6 @@ async def run(args):
             sys.exit(1)
 
         client = KeepaClient(api_key=api_key)
-
-        # Check token budget before starting
-        log.info("  Checking Keepa token budget...")
-        await check_token_budget(client)
 
         # Always include DE for baseline + target domains
         validation_domains = list(dict.fromkeys(["DE"] + target_domains))

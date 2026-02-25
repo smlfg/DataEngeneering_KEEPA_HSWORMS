@@ -10,5 +10,6 @@ reports/
 # Generated scraper/API outputs (keep seed files, ignore generated data)
 **/data/amazon_asins_raw.*
 **/data/keepa_search_*
-**/data/orchestrator_log.txt
+**/data/keyboard_targets_*
+**/data/orchestrator_log*.txt
 **/data/scraper_log.txt
