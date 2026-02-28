@@ -4,6 +4,14 @@
 
 Beim `docker-compose up` sollen 2 fertige Kibana-Dashboards automatisch geladen werden -- ohne manuelles Klicken in der Kibana UI. Beim Prüfungs-Demo: Container starten → Kibana öffnen → Dashboards sind da.
 
+## Aktueller Stand (verifiziert)
+
+- Kibana 8.11.0 läuft, aber **komplett leer** (keine Data Views, keine Dashboards)
+- 2 ES-Indices: `keeper-prices` (10 Felder) + `keeper-deals` (16 Felder + German Stemming)
+- `keeper-deals` hat Custom Analyzer `deal_analyzer` + Completion für Autocomplete
+- Keine Init-Scripts, keine NDJSON-Exports vorhanden
+- `docs/ELASTICSEARCH.md` beschreibt manuelle Setup-Schritte
+
 ## Architektur
 
 ```
@@ -16,27 +24,31 @@ docker-compose.yml
 ```
 
 **Warum ein Init-Service statt Volume-Mount?**
-Kibana 8.x hat keinen Auto-Import-Ordner. Man muss die Saved Objects API (`/api/saved_objects/_import`) aufrufen. Ein kleiner Alpine-Container mit curl erledigt das.
+Kibana 8.x hat keinen Auto-Import-Ordner. Man muss die Saved Objects API (`/api/saved_objects/_import`) aufrufen. Ein kleiner curl-Container erledigt das.
 
 ---
 
 ## 2 Dashboards
 
-### Dashboard 1: "Deal Overview"
-Für `keeper-deals` Index:
-- **Metric**: Gesamt-Deals (Count)
-- **Metric**: Durchschnitts-Rabatt (Avg discount_percent)
-- **Pie Chart**: Deals nach Domain (DE/UK/FR/IT/ES)
-- **Bar Chart**: Top 10 Deals nach deal_score
-- **Line Chart**: Deals über Zeit (date_histogram auf timestamp)
-- **Data Table**: Letzte 20 Deals (title, current_price, discount_percent, domain, deal_score)
+### Dashboard 1: "Deal Overview" (`keeper-deals`)
 
-### Dashboard 2: "Price Monitor"
-Für `keeper-prices` Index:
-- **Metric**: Gesamt Price Events
-- **Line Chart**: Preisverlauf über Zeit (avg current_price pro Tag)
-- **Pie Chart**: Events nach Domain
-- **Data Table**: Letzte 20 Preisänderungen (asin, current_price, price_change_percent, domain)
+| Panel | Typ | Konfiguration |
+|-------|-----|---------------|
+| Gesamt-Deals | Metric | Count of documents |
+| Durchschnitts-Rabatt | Metric | avg(discount_percent) |
+| Deals nach Domain | Pie Chart | Terms agg auf `domain` |
+| Discount-Verteilung | Histogram | Histogram auf `discount_percent`, interval=10 |
+| Deals über Zeit | Line Chart | date_histogram auf `timestamp`, interval=1d |
+| Letzte 20 Deals | Data Table | title, current_price, discount_percent, domain, deal_score, sortiert nach timestamp desc |
+
+### Dashboard 2: "Price Monitor" (`keeper-prices`)
+
+| Panel | Typ | Konfiguration |
+|-------|-----|---------------|
+| Gesamt Price Events | Metric | Count of documents |
+| Preisverlauf | Line Chart | date_histogram auf `timestamp`, Y=avg(current_price) |
+| Events nach Domain | Pie Chart | Terms agg auf `domain` |
+| Letzte 20 Preisänderungen | Data Table | asin, product_title, current_price, price_change_percent, domain |
 
 ---
 
@@ -44,7 +56,7 @@ Für `keeper-prices` Index:
 
 ### Schritt 1: `kibana/saved_objects.ndjson` erstellen
 
-NDJSON-Datei mit allen Saved Objects:
+NDJSON-Datei mit allen Saved Objects im Kibana 8.11 Lens-Format:
 1. **Data View** `keeper-deals` (timeField: timestamp)
 2. **Data View** `keeper-prices` (timeField: timestamp)
 3. **6 Lens-Visualisierungen** für Deal Dashboard
@@ -52,13 +64,10 @@ NDJSON-Datei mit allen Saved Objects:
 5. **Dashboard** "Deal Overview" (referenziert die 6 Panels)
 6. **Dashboard** "Price Monitor" (referenziert die 4 Panels)
 
-Kibana 8.11 nutzt das Lens-Format für Visualisierungen. Jedes Saved Object ist eine JSON-Zeile im NDJSON.
-
 ### Schritt 2: `kibana/setup-kibana.sh` erstellen
 
 ```bash
-#!/bin/bash
-# Wartet bis Kibana erreichbar ist, importiert Saved Objects
+#!/bin/sh
 KIBANA_URL="http://kibana:5601"
 MAX_RETRIES=60
 
@@ -69,6 +78,7 @@ for i in $(seq 1 $MAX_RETRIES); do
     curl -X POST "$KIBANA_URL/api/saved_objects/_import?overwrite=true" \
       -H "kbn-xsrf: true" \
       --form file=@/setup/saved_objects.ndjson
+    echo ""
     echo "Dashboards imported successfully!"
     exit 0
   fi
@@ -81,40 +91,30 @@ exit 1
 
 ### Schritt 3: docker-compose.yml ergänzen
 
-Neuer Service `kibana-setup`:
 ```yaml
 kibana-setup:
-  image: curlimages/curl:latest
+  image: curlimages/curl:8.5.0
   depends_on:
     - kibana
   volumes:
-    - ./kibana:/setup
+    - ./kibana:/setup:ro
   entrypoint: ["/bin/sh", "/setup/setup-kibana.sh"]
   restart: "no"
 ```
 
-Kein neuer langlebiger Container -- startet einmal, importiert, beendet sich. Zeigt in `docker-compose ps` als "Exit 0" an.
+Kein neuer langlebiger Container -- startet einmal, importiert, beendet sich (Exit 0).
 
 ### Schritt 4: Verifikation
 
 ```bash
-# 1. Rebuild + Restart
 docker-compose up -d
-
-# 2. Warten bis kibana-setup fertig ist
-docker-compose logs kibana-setup  # → "Dashboards imported successfully!"
-
-# 3. Kibana öffnen
-# http://localhost:5601 → Hamburger Menu → Dashboard
-# → "Deal Overview" und "Price Monitor" sollten sichtbar sein
-
-# 4. Deal Dashboard hat Daten?
-curl -s http://localhost:9200/keeper-deals/_count | python3 -c "import sys,json; print('Deals:', json.load(sys.stdin)['count'])"
+docker-compose logs -f kibana-setup  # → "Dashboards imported successfully!"
+# http://localhost:5601 → Dashboard → "Deal Overview" / "Price Monitor"
 ```
 
 ### Schritt 5: FOR_SMLFLG.md dokumentieren
 
-Neuer Abschnitt "Kibana Auto-Load Dashboards" mit Beschreibung der Dashboards und wie der Auto-Import funktioniert.
+Neuer Abschnitt "Kibana Auto-Load Dashboards".
 
 ---
 
@@ -123,12 +123,19 @@ Neuer Abschnitt "Kibana Auto-Load Dashboards" mit Beschreibung der Dashboards un
 | Datei | Aktion | Beschreibung |
 |-------|--------|-------------|
 | `kibana/saved_objects.ndjson` | NEU | Alle Saved Objects (Data Views + Visualisierungen + Dashboards) |
-| `kibana/setup-kibana.sh` | NEU | Init-Script das auf Kibana wartet und importiert |
+| `kibana/setup-kibana.sh` | NEU | Init-Script: wartet auf Kibana, importiert NDJSON |
 | `docker-compose.yml` | EDIT | `kibana-setup` Service hinzufügen |
 | `FOR_SMLFLG.md` | EDIT | Dashboard-Feature dokumentieren |
 
+## Delegation
+
+- **NDJSON-Generierung:** OpenCode MCP (Sonnet) — das ist die komplexeste Datei, ~200 Zeilen NDJSON mit exakten Kibana 8.11 Saved Object IDs
+- **setup-kibana.sh:** Direkt (triviales Shell-Script)
+- **docker-compose.yml Edit:** Direkt (5 Zeilen)
+- **FOR_SMLFLG.md:** Direkt
+
 ## Risiken
 
-- **NDJSON-Format**: Kibana 8.11 Saved Objects haben ein spezifisches Format. Muss exakt stimmen, sonst Import-Fehler. → Wir bauen die NDJSON vorsichtig mit korrekten IDs und Referenzen.
-- **Timing**: Kibana braucht ~30-60s zum Starten. Das Script wartet bis zu 5 Minuten (60 × 5s). Reicht locker.
-- **Keine Daten beim ersten Start**: Dashboards sind leer wenn ES noch keine Deals hat. Das ist OK -- nach dem ersten Scheduler-Zyklus (~1h) kommen Daten rein.
+- **NDJSON-Format**: Kibana 8.11 Saved Objects haben ein spezifisches Format. Muss exakt stimmen → Gemini vorher nach aktuellem Format fragen
+- **Timing**: Script wartet bis 5 Minuten (60 × 5s). Reicht locker.
+- **Keine Daten beim ersten Start**: Dashboards sind leer bis erste Deals kommen. OK -- zeigt bei Prüfung die Struktur.
